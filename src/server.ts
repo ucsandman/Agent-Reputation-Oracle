@@ -47,12 +47,21 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// x402 payment middleware (BEFORE route handlers)
-app.use(createPaymentMiddleware(config));
-
 // Mount routes
-app.use('/reputation', createReputationRouter(eventLog, cache, engine, receiptService));
-app.use('/reputation/event', createEventsRouter(eventLog, cache, attestationService, config));
+const reputationRouter = createReputationRouter(eventLog, cache, engine, receiptService);
+const eventsRouter = createEventsRouter(eventLog, cache, attestationService, config);
+
+if (config.nodeEnv === 'production') {
+  // x402 payment middleware (BEFORE route handlers) — production only
+  app.use(createPaymentMiddleware(config));
+  app.use('/reputation', reputationRouter);
+  app.use('/reputation/event', eventsRouter);
+} else {
+  // Development mode: routes without payment gating
+  console.log('Development mode: x402 payment middleware disabled');
+  app.use('/reputation/event', eventsRouter);
+  app.use('/reputation', reputationRouter);
+}
 
 // Start server
 app.listen(config.port, () => {

@@ -64,5 +64,6 @@ export function createPaymentMiddleware(config: AppConfig) {
     },
   };
 
-  return paymentMiddleware(routes, server);
+  const syncOnStart = config.nodeEnv === 'production';
+  return paymentMiddleware(routes, server, undefined, undefined, syncOnStart);
 }
