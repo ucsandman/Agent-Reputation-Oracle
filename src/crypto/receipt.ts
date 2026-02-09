@@ -6,7 +6,7 @@ import type {
   SignedReceipt,
 } from '../types/index.js';
 import {
-  REPUTATION_ORACLE_DOMAIN,
+  getReputationOracleDomain,
   RECEIPT_TYPES,
   hashReputationVector,
 } from './signing.js';
@@ -39,7 +39,7 @@ export class ReceiptService {
     };
 
     const signature = await this.account.signTypedData({
-      domain: REPUTATION_ORACLE_DOMAIN,
+      domain: getReputationOracleDomain(),
       types: RECEIPT_TYPES,
       primaryType: 'ReputationReceipt',
       message,
@@ -65,7 +65,7 @@ export class ReceiptService {
 
     const valid = await verifyTypedData({
       address: receipt.oracleAddress,
-      domain: REPUTATION_ORACLE_DOMAIN,
+      domain: getReputationOracleDomain(),
       types: RECEIPT_TYPES,
       primaryType: 'ReputationReceipt',
       message,

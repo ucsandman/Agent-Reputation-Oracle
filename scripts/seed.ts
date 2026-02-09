@@ -3,7 +3,7 @@ import { dirname } from 'node:path';
 import { v4 as uuidv4 } from 'uuid';
 import { privateKeyToAccount } from 'viem/accounts';
 import { EventLog } from '../src/storage/event-log.js';
-import { REPUTATION_ORACLE_DOMAIN, REPUTATION_EVENT_TYPES, hashEvent } from '../src/crypto/signing.js';
+import { getReputationOracleDomain, setChainId, REPUTATION_EVENT_TYPES, hashEvent } from '../src/crypto/signing.js';
 import type { ReputationEvent, EvmAddress, ReputationEventData } from '../src/types/index.js';
 
 process.on('unhandledRejection', (reason) => {
@@ -12,6 +12,9 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const DB_PATH = process.env['DB_PATH'] ?? './data/reputation.db';
+const network = process.env['X402_NETWORK'] ?? 'eip155:84532';
+const chainId = parseInt(network.split(':')[1] ?? '84532', 10);
+setChainId(chainId);
 
 // Test accounts (Hardhat default accounts - never use in production)
 const AGENT_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80' as const;
@@ -50,7 +53,7 @@ async function createSignedEvent(
   const dataHash = hashEvent(event);
 
   const signature = await signerAccount.signTypedData({
-    domain: REPUTATION_ORACLE_DOMAIN,
+    domain: getReputationOracleDomain(),
     types: REPUTATION_EVENT_TYPES,
     primaryType: 'ReputationEvent',
     message: {

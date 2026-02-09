@@ -7,6 +7,7 @@ import { ReputationCache } from './storage/cache.js';
 import { ReputationEngine } from './reputation/engine.js';
 import { AttestationService } from './crypto/attestation.js';
 import { ReceiptService } from './crypto/receipt.js';
+import { setChainId } from './crypto/signing.js';
 import { createPaymentMiddleware } from './x402/middleware.js';
 import { createReputationRouter } from './routes/reputation.js';
 import { createEventsRouter } from './routes/events.js';
@@ -17,6 +18,10 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const config = loadConfig();
+
+// Set EIP-712 chain ID from network config (e.g. "eip155:8453" → 8453)
+const chainId = parseInt(config.x402.network.split(':')[1] ?? '84532', 10);
+setChainId(chainId);
 
 // Ensure data directory exists
 const dbDir = dirname(config.db.path);

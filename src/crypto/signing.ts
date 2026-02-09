@@ -7,6 +7,22 @@ import type {
 
 // ─── EIP-712 Domain ───
 
+let _chainId = 84532;
+
+export function setChainId(chainId: number): void {
+  _chainId = chainId;
+}
+
+export function getReputationOracleDomain() {
+  return {
+    name: 'AgentReputationOracle' as const,
+    version: '1' as const,
+    chainId: _chainId,
+    verifyingContract: '0x0000000000000000000000000000000000000000' as EvmAddress,
+  };
+}
+
+/** @deprecated Use getReputationOracleDomain() for dynamic chainId. Kept for backward compat in tests. */
 export const REPUTATION_ORACLE_DOMAIN = {
   name: 'AgentReputationOracle',
   version: '1',
@@ -71,7 +87,7 @@ export async function verifyEventSignature(
 
   const valid = await verifyTypedData({
     address: event.proof.signer,
-    domain: REPUTATION_ORACLE_DOMAIN,
+    domain: getReputationOracleDomain(),
     types: REPUTATION_EVENT_TYPES,
     primaryType: 'ReputationEvent',
     message,

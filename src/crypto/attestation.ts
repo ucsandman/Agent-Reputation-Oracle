@@ -1,7 +1,7 @@
 import { verifyTypedData, type Hex } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { EvmAddress } from '../types/index.js';
-import { REPUTATION_ORACLE_DOMAIN } from './signing.js';
+import { getReputationOracleDomain } from './signing.js';
 
 // ─── EIP-712 Attestation Type ───
 
@@ -49,7 +49,7 @@ export class AttestationService {
     };
 
     const signature = await this.account.signTypedData({
-      domain: REPUTATION_ORACLE_DOMAIN,
+      domain: getReputationOracleDomain(),
       types: ATTESTATION_TYPES,
       primaryType: 'EventAcceptance',
       message,
@@ -75,7 +75,7 @@ export class AttestationService {
 
     const valid = await verifyTypedData({
       address: attestation.signer,
-      domain: REPUTATION_ORACLE_DOMAIN,
+      domain: getReputationOracleDomain(),
       types: ATTESTATION_TYPES,
       primaryType: 'EventAcceptance',
       message,
