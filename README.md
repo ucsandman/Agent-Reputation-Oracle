@@ -42,6 +42,37 @@ All endpoints (except `/health`) require x402 payment.
 | GET | `/reputation/:agentId/attestations` | $0.001 | Paginated event history |
 | POST | `/reputation/event` | $0.01 | Submit signed reputation event |
 
+## SDK
+
+A TypeScript client SDK is available at [`sdk/`](./sdk/). See [`sdk/README.md`](./sdk/README.md) for full documentation.
+
+```bash
+cd sdk && npm install
+```
+
+```typescript
+import { ReputationOracleClient } from '@agent-reputation-oracle/sdk';
+
+const client = new ReputationOracleClient({
+  oracleUrl: 'http://localhost:3402',
+  privateKey: '0xYOUR_KEY', // required for submitEvent
+});
+
+// Query reputation
+const { vector, receipt } = await client.getReputation('0xAGENT');
+
+// Submit event
+await client.submitEvent('0xAGENT', {
+  type: 'transaction_completed',
+  completedSuccessfully: true,
+  valueUsd: 50,
+  durationMs: 3000,
+});
+
+// Verify receipt
+const valid = await client.verifyReceipt(receipt);
+```
+
 ## Architecture
 
 - **Storage**: SQLite with WAL mode, append-only event log

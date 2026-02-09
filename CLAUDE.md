@@ -24,6 +24,7 @@ Protocol-native Agent Reputation Oracle for autonomous AI agents on the x402 pay
 | x402 | `src/x402/` | Payment middleware, pricing |
 | Routes | `src/routes/` | API endpoints |
 | Server | `src/server.ts` | Entry point |
+| SDK | `sdk/` | TypeScript client SDK (`@agent-reputation-oracle/sdk`) |
 
 ## Commands
 
@@ -38,6 +39,11 @@ npm run lint         # TypeScript type check
 npm run typecheck    # TypeScript type check
 npm run seed         # Seed database with sample data
 npm run replay       # Replay event log
+
+# SDK (sdk/)
+cd sdk && npm install   # Install SDK dependencies
+cd sdk && npm test      # Run SDK tests
+cd sdk && npm run build # Compile SDK to dist/
 ```
 
 ## Configuration
