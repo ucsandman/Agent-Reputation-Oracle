@@ -2,7 +2,8 @@
 
 Base URL: `http://localhost:3402`
 
-All endpoints except `/health` require x402 payment. Requests without a valid `X-PAYMENT` header receive `402 Payment Required` with pricing metadata in the response.
+All endpoints except `/v1/health` require x402 payment. Requests without a valid `X-PAYMENT` header receive `402 Payment Required` with pricing metadata in the response.
+Unversioned routes remain available as backward-compatible aliases.
 
 ## Authentication via x402
 
@@ -28,7 +29,7 @@ On `402` response, the server returns:
 
 ---
 
-## GET /health
+## GET /v1/health
 
 Free endpoint. No payment required.
 
@@ -44,7 +45,7 @@ Free endpoint. No payment required.
 
 ---
 
-## GET /reputation/:agentId
+## GET /v1/reputation/:agentId
 
 Full reputation vector with EIP-712 signed receipt.
 
@@ -89,7 +90,7 @@ Full reputation vector with EIP-712 signed receipt.
 
 ---
 
-## GET /reputation/:agentId/summary
+## GET /v1/reputation/:agentId/summary
 
 Lightweight reputation summary without a signed receipt.
 
@@ -115,11 +116,11 @@ Lightweight reputation summary without a signed receipt.
 }
 ```
 
-**Error responses:** Same as `GET /reputation/:agentId`.
+**Error responses:** Same as `GET /v1/reputation/:agentId`.
 
 ---
 
-## GET /reputation/:agentId/attestations
+## GET /v1/reputation/:agentId/attestations
 
 Paginated event history for an agent.
 
@@ -181,7 +182,7 @@ Valid `type` values: `transaction_completed`, `sla_verified`, `arbitration_resul
 
 ---
 
-## POST /reputation/event
+## POST /v1/reputation/event
 
 Submit a signed reputation event for an agent.
 

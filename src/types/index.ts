@@ -176,6 +176,7 @@ export interface AppConfig {
     payTo: EvmAddress;
     facilitatorUrl: string;
     scheme: string;
+    syncOnStart: boolean;
   };
   pricing: {
     reputationQuery: string;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Agent Reputation Oracle is an HTTP service that computes, stores, and serves reputation vectors for EVM-identified AI agents. Every API call (except `/health`) requires an x402 micropayment. Reputation events are submitted by third-party attesters, stored in an append-only SQLite log, and aggregated into a multi-dimensional reputation vector using time-decayed Bayesian scoring.
+The Agent Reputation Oracle is an HTTP service that computes, stores, and serves reputation vectors for EVM-identified AI agents. Every API call (except `/v1/health`) requires an x402 micropayment in production. Reputation events are submitted by third-party attesters, stored in an append-only SQLite log, and aggregated into a multi-dimensional reputation vector using time-decayed Bayesian scoring.
 
 ## Components
 
@@ -30,7 +30,7 @@ src/
 
   routes/
     reputation.ts      GET /:agentId, GET /:agentId/summary, GET /:agentId/attestations
-    events.ts          POST /reputation/event
+    events.ts          POST /v1/reputation/event
 
   x402/
     middleware.ts      x402 payment middleware configuration
@@ -96,7 +96,7 @@ src/
 
 ## x402 Payment Integration
 
-All endpoints except `GET /health` are gated by the `@x402/express` payment middleware. The middleware intercepts requests before they reach route handlers.
+All endpoints except `GET /v1/health` are gated by the `@x402/express` payment middleware in production. The middleware intercepts requests before they reach route handlers.
 
 **Flow:**
 1. Client sends request with `X-PAYMENT` header containing a signed x402 payment proof.
@@ -108,10 +108,10 @@ All endpoints except `GET /health` are gated by the `@x402/express` payment midd
 
 | Route                              | Price (USD) |
 |------------------------------------|-------------|
-| `GET /reputation/:agentId`         | $0.001      |
-| `GET /reputation/:agentId/summary` | $0.0005     |
-| `GET /reputation/:agentId/attestations` | $0.001 |
-| `POST /reputation/event`           | $0.01       |
+| `GET /v1/reputation/:agentId`         | $0.001      |
+| `GET /v1/reputation/:agentId/summary` | $0.0005     |
+| `GET /v1/reputation/:agentId/attestations` | $0.001 |
+| `POST /v1/reputation/event`           | $0.01       |
 
 Payments are sent to the address configured in `X402_PAY_TO`. The scheme is `exact` (EVM exact payment via `@x402/evm`).
 

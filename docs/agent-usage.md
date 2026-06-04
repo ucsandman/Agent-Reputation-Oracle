@@ -26,7 +26,7 @@ console.log('Agent address:', account.address);
 Free endpoint. No payment required.
 
 ```bash
-curl http://localhost:3402/health
+curl http://localhost:3402/v1/health
 ```
 
 ```json
@@ -48,7 +48,7 @@ Save the `oracle` address -- you will use it to verify receipts.
 
 ```bash
 curl -H "X-PAYMENT: <x402-payment-proof>" \
-  http://localhost:3402/reputation/0xTargetAgentAddress
+  http://localhost:3402/v1/reputation/0xTargetAgentAddress
 ```
 
 Response includes a `receipt` with an EIP-712 signature you can verify independently.
@@ -59,7 +59,7 @@ Response includes a `receipt` with an EIP-712 signature you can verify independe
 
 ```bash
 curl -H "X-PAYMENT: <x402-payment-proof>" \
-  http://localhost:3402/reputation/0xTargetAgentAddress/summary
+  http://localhost:3402/v1/reputation/0xTargetAgentAddress/summary
 ```
 
 Returns `isActive` and `confidence` fields in addition to scores.
@@ -70,7 +70,7 @@ Returns `isActive` and `confidence` fields in addition to scores.
 
 ```bash
 curl -H "X-PAYMENT: <x402-payment-proof>" \
-  "http://localhost:3402/reputation/0xTargetAgentAddress/attestations?limit=20&offset=0&type=transaction_completed"
+  "http://localhost:3402/v1/reputation/0xTargetAgentAddress/attestations?limit=20&offset=0&type=transaction_completed"
 ```
 
 ## 4. Submit a Reputation Event
@@ -152,7 +152,7 @@ const fullEvent = {
   },
 };
 
-const response = await fetch('http://localhost:3402/reputation/event', {
+const response = await fetch('http://localhost:3402/v1/reputation/event', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -175,7 +175,7 @@ const result = await response.json();
 
 ## 5. Verify a Receipt
 
-When you query `GET /reputation/:agentId`, the response includes a signed receipt. Verify it to confirm the oracle produced the data.
+When you query `GET /v1/reputation/:agentId`, the response includes a signed receipt. Verify it to confirm the oracle produced the data.
 
 ```typescript
 import { verifyTypedData } from 'viem';
@@ -211,7 +211,7 @@ const isValid = await verifyTypedData({
 });
 
 console.log('Receipt valid:', isValid);
-// Also verify: receipt.oracleAddress matches the /health oracle address
+// Also verify: receipt.oracleAddress matches the /v1/health oracle address
 ```
 
 ## 6. Key Rotation
@@ -263,7 +263,7 @@ The oracle stores the mapping in the `agents` table under `previous_addresses`. 
 ## Decision Flow for Consuming Reputation
 
 ```
-1. Query GET /reputation/:agentId
+1. Query GET /v1/reputation/:agentId
 2. Verify the EIP-712 receipt signature
 3. Check receipt.oracleAddress matches known oracle
 4. Evaluate:

@@ -32,6 +32,7 @@ const TEST_CONFIG: AppConfig = {
     payTo: '0x0000000000000000000000000000000000000000' as EvmAddress,
     facilitatorUrl: 'http://localhost:4021',
     scheme: 'exact',
+    syncOnStart: false,
   },
   pricing: {
     reputationQuery: '0',

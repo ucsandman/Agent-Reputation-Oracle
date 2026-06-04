@@ -39,7 +39,7 @@
 
 **Residual risk:** If the signing key is compromised, the attacker can produce valid-looking receipts until the key is rotated. Key rotation invalidates the old oracle address, but previously issued receipts remain valid under the old key.
 
-**Detection:** Consumers should compare the `oracleAddress` in receipts against the value returned by `GET /health`. A mismatch indicates potential compromise or key rotation.
+**Detection:** Consumers should compare the `oracleAddress` in receipts against the value returned by `GET /v1/health`. A mismatch indicates potential compromise or key rotation.
 
 ## 4. Self-Attestation
 
@@ -83,7 +83,7 @@
 - **Rate limiting.** 100 events per agent per hour on the write path.
 - **SQLite WAL mode.** Concurrent reads are not blocked by writes, limiting the blast radius of write-heavy attacks.
 
-**Residual risk:** The `GET /health` endpoint is free and unmetered. Standard infrastructure-level rate limiting (reverse proxy, CDN) should be applied in production.
+**Residual risk:** The `GET /v1/health` endpoint is free and unmetered. Standard infrastructure-level rate limiting (reverse proxy, CDN) should be applied in production.
 
 ## Summary Table
 

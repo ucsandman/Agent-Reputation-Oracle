@@ -9,6 +9,7 @@ const ConfigSchema = z.object({
   X402_PAY_TO: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
   X402_FACILITATOR_URL: z.string().url().default('https://facilitator.x402.org'),
   X402_SCHEME: z.string().default('exact'),
+  X402_SYNC_ON_START: z.enum(['true', 'false']).default('false').transform((value) => value === 'true'),
 
   PRICE_REPUTATION_QUERY: z.string().default('0.001'),
   PRICE_REPUTATION_SUMMARY: z.string().default('0.0005'),
@@ -33,6 +34,7 @@ export function loadConfig(): AppConfig {
       payTo: parsed.X402_PAY_TO as EvmAddress,
       facilitatorUrl: parsed.X402_FACILITATOR_URL,
       scheme: parsed.X402_SCHEME,
+      syncOnStart: parsed.X402_SYNC_ON_START,
     },
     pricing: {
       reputationQuery: parsed.PRICE_REPUTATION_QUERY,

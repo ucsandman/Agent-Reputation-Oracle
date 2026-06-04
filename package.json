@@ -12,17 +12,27 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "demo": "tsx scripts/demo.ts",
     "seed": "tsx scripts/seed.ts",
     "replay": "tsx scripts/replay.ts"
   },
-  "keywords": ["x402", "reputation", "oracle", "agent", "evm"],
+  "keywords": [
+    "x402",
+    "reputation",
+    "oracle",
+    "agent",
+    "evm"
+  ],
   "author": "ucsandman",
   "license": "MIT",
+  "overrides": {
+    "ws": "^8.20.1"
+  },
   "dependencies": {
     "@x402/core": "^2.3.0",
     "@x402/evm": "^2.3.0",
     "@x402/express": "^2.3.0",
-    "better-sqlite3": "^11.7.0",
+    "better-sqlite3": "^12.10.0",
     "express": "^4.21.0",
     "uuid": "^11.0.0",
     "viem": "^2.21.0",
@@ -37,6 +47,6 @@
     "supertest": "^7.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.7.0",
-    "vitest": "^2.1.0"
+    "vitest": "^4.1.8"
   }
 }

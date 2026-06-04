@@ -16,8 +16,53 @@ export function createPaymentMiddleware(config: AppConfig) {
   const server = new x402ResourceServer(facilitatorClient);
   registerExactEvmScheme(server);
 
-  // Route config: more specific routes FIRST (x402 matches in order)
+  // Route config: more specific routes FIRST (x402 matches in order).
+  // Keep legacy unversioned routes during the /v1 transition.
   const routes = {
+    'GET /v1/reputation/*/summary': {
+      accepts: {
+        scheme: config.x402.scheme,
+        network,
+        payTo: config.x402.payTo,
+        price: pricing.reputationSummary,
+        maxTimeoutSeconds: 60,
+      },
+      description: 'Lightweight reputation summary',
+      mimeType: 'application/json',
+    },
+    'GET /v1/reputation/*/attestations': {
+      accepts: {
+        scheme: config.x402.scheme,
+        network,
+        payTo: config.x402.payTo,
+        price: pricing.attestationQuery,
+        maxTimeoutSeconds: 60,
+      },
+      description: 'Paginated event history',
+      mimeType: 'application/json',
+    },
+    'GET /v1/reputation/*': {
+      accepts: {
+        scheme: config.x402.scheme,
+        network,
+        payTo: config.x402.payTo,
+        price: pricing.reputationQuery,
+        maxTimeoutSeconds: 60,
+      },
+      description: 'Full reputation vector with signed receipt',
+      mimeType: 'application/json',
+    },
+    'POST /v1/reputation/event': {
+      accepts: {
+        scheme: config.x402.scheme,
+        network,
+        payTo: config.x402.payTo,
+        price: pricing.eventSubmit,
+        maxTimeoutSeconds: 60,
+      },
+      description: 'Submit signed reputation event',
+      mimeType: 'application/json',
+    },
     'GET /reputation/*/summary': {
       accepts: {
         scheme: config.x402.scheme,
@@ -64,6 +109,5 @@ export function createPaymentMiddleware(config: AppConfig) {
     },
   };
 
-  const syncOnStart = config.nodeEnv === 'production';
-  return paymentMiddleware(routes, server, undefined, undefined, syncOnStart);
+  return paymentMiddleware(routes, server, undefined, undefined, config.x402.syncOnStart);
 }

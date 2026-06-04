@@ -1,0 +1,13 @@
+node_modules
+sdk/node_modules
+dist
+sdk/dist
+data
+coverage
+.git
+.env
+*.db
+*.db-shm
+*.db-wal
+*.tsbuildinfo
+npm-debug.log*
