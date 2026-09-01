@@ -236,10 +236,11 @@ describe('math scoring functions', () => {
       expect(weight).toBe(0);
     });
 
-    it('returns ln(1+N) for N recent events', () => {
+    it('returns ln(1+N) for N recent events from N distinct attesters', () => {
       const n = 10;
-      const events = Array.from({ length: n }, () =>
+      const events = Array.from({ length: n }, (_, i) =>
         makeEvent({
+          sourceAgentId: `0x${String(i).repeat(40)}` as EvmAddress,
           data: {
             type: 'transaction_completed',
             completedSuccessfully: true,

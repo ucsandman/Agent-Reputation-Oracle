@@ -1,0 +1,102 @@
+# Outreach: 3-Day Demand Test
+
+Goal: find out if anyone running agents or an agent marketplace actually has a
+"bad agent" problem today, before building more of the oracle. This is a
+demand test, not a sales push. Three days, one question, no pitch.
+
+Rule: only reach out from the channels below. Do not cold-email anyone whose
+address isn't publicly listed. Do not DM. Post in public channels
+(GitHub issue/discussion, Discord, reply to their own X post) so the ask
+looks like what it is: one builder asking a question in public.
+
+## Targets
+
+Evidence for every row below was checked directly (repo page, X profile, or
+site) on 2026-09-01. No handle here is guessed.
+
+| # | Target | What they run | Why a bad agent hurts them | Best public channel | Evidence |
+|---|--------|----------------|------------------------------|----------------------|----------|
+| 1 | x402 Foundation | Governs the x402 HTTP payment protocol standard (Coinbase + Cloudflare + Linux Foundation) | A bad agent that exploits the payment flow (malformed 402 responses, fraudulent claims) damages trust in the standard itself, not just one app | GitHub Issues on the foundation repo | [github.com/x402-foundation/x402](https://github.com/x402-foundation/x402) (6.6k stars, Issues enabled, no Discussions tab) |
+| 2 | Coinbase AgentKit | Wallet + onchain toolkit that agent developers plug into their agents | A bad agent built with AgentKit that scams or drains a wallet lands back on Coinbase's support queue and reputation | GitHub Issues on the repo, or CDP Discord | [github.com/coinbase/agentkit](https://github.com/coinbase/agentkit) (Issues enabled, no Discussions tab); Discord referenced in [CONTRIBUTING.md](https://github.com/coinbase/agentkit/blob/main/CONTRIBUTING.md) |
+| 3 | x402 Bazaar | Coinbase's discovery index of 100+ paid x402 APIs agents call automatically | An agent calling a malicious or broken listed service loses real USDC with no recourse, the opposite of "search engine for agents" | X reply to @CoinbaseDev's Bazaar launch thread | [x.com/CoinbaseDev/status/1965445897489428869](https://x.com/CoinbaseDev/status/1965445897489428869) |
+| 4 | x402scan | Ecosystem explorer/analytics for x402 payment traffic, built by Merit Systems | Bad actors spoofing or wash-trading payments corrupt the exact data the explorer reports as ecosystem activity | X @x402scan | [x.com/x402scan](https://x.com/x402scan), [github.com/Merit-Systems/x402scan](https://github.com/Merit-Systems/x402scan) |
+| 5 | PayAI Network | x402 payment facilitator settling agent-to-agent payments on Solana + EVM | A facilitator that lets a bad agent's payment through, or gets used for wash volume, damages its pitch as a neutral, trustworthy rail | X @PayAINetwork | [x.com/PayAINetwork](https://x.com/PayAINetwork), [github.com/PayAINetwork](https://github.com/PayAINetwork) |
+| 6 | 8004scan (AltLayer) | Explorer indexing 20k+ ERC-8004 agents, including onchain reputation/feedback | Their product's entire value is presenting reputation and feedback data; Sybil or garbage feedback pollutes exactly that | X @8004_scan | [x.com/yq_acc/status/2003501564691120232](https://x.com/yq_acc/status/2003501564691120232) (AltLayer team confirming the @8004_scan account), [8004scan.io](https://8004scan.io) |
+| 7 | RNWY (AI Rights Institute) | Sells "trust intelligence and reputation scoring" for ERC-8004 agents | Reputation scoring is the whole product; unreliable underlying signal is an existential problem for them, not a side issue | X @RNWY_official, or GitHub | [x.com/RNWY_official](https://x.com/RNWY_official), [github.com/rnwy](https://github.com/rnwy), [rnwy.com/explorer](https://rnwy.com/explorer) |
+| 8 | Veylux | Early reference implementation of a Sybil-resistant trust protocol for agents (staking, cluster analysis, decayed reputation) | Working the same problem from a different angle; likely has a direct opinion on what actually works and what doesn't | GitHub Issues | [github.com/kenjimoto999/veylux](https://github.com/kenjimoto999/veylux) (small early-stage repo, 1 star, Issues enabled, no other contact listed) |
+| 9 | Agent Arena (Vistara Labs) | On-chain registry and search layer for ERC-8004 agents | Same reputation-pollution problem as any agent explorer: bad agents in the registry make the search layer less useful | X @vistaralabs | [x.com/vistaralabs](https://x.com/vistaralabs), [github.com/vistara-apps/agent-arena-v1](https://github.com/vistara-apps/agent-arena-v1) |
+| 10 | ChaosChain | Accountability layer pitched as letting businesses "trust agents with real money" | A single bad agent slipping through breaks their core sales pitch directly | GitHub Issues or Discussions | [github.com/ChaosChain/trustless-agents-erc-ri](https://github.com/ChaosChain/trustless-agents-erc-ri) (54 stars, 10 open issues, README links to GitHub Discussions) |
+| 11 | Virtuals Protocol | Agent Commerce Protocol (ACP): agents hire each other for on-chain USDC-escrowed jobs | A bad agent that takes escrowed payment and doesn't deliver breaks trust in the escrow/hiring flow for the whole marketplace | Discord, or X @virtuals_io | [discord.com/invite/virtualsio](https://discord.com/invite/virtualsio) (12.7k members), [x.com/virtuals_io](https://x.com/virtuals_io) |
+| 12 | Olas (Autonolas) | Decentralized marketplace where agents offer skills and hire other agents | Paying to hire an unreliable agent with no recourse is the direct failure mode of a peer-to-peer agent marketplace | Discord | [discord.com/invite/BQzYqhjGjQ](https://discord.com/invite/BQzYqhjGjQ) (5.9k members), [github.com/valory-xyz/autonolas-marketplace](https://github.com/valory-xyz/autonolas-marketplace) |
+| 13 | Fetch.ai (Agentverse) | Marketplace to browse, discover, and chat with agents | A bad agent surfaced in the marketplace directly damages user trust in the discovery product | X @Fetch_ai | [twitter.com/fetch_ai](https://twitter.com/fetch_ai), [agentverse.ai/marketplace](https://agentverse.ai/marketplace) |
+| 14 | Skyfire | Identity and payment rails for autonomous agent transactions ("Know Your Agent") | If an agent Skyfire verified turns out to be a bad actor, it undermines the identity guarantee the whole product is built on | X @trySkyfire | [x.com/trySkyfire](https://x.com/trySkyfire), [skyfire.xyz](https://skyfire.xyz/) |
+| 15 | Nevermined | Payments infrastructure for AI agents (72,500+ buyers, 1.38M transactions since May 2025) | Disputes and chargebacks caused by bad agents are a direct, measurable operational cost at that transaction volume | X @Nevermined_io, or Discord | [twitter.com/nevermined_io](https://twitter.com/nevermined_io), [github.com/nevermined-io](https://github.com/nevermined-io), Discord [discord.gg/GZju2qScKq](https://discord.gg/GZju2qScKq) |
+| 16 | Smithery | Registry and hosting for 6,000+ MCP servers | A malicious or broken listed server damages trust in the whole registry, since users install directly from it | X @SmitheryDotAI | [twitter.com/SmitheryDotAI](https://twitter.com/SmitheryDotAI), [github.com/smithery-ai](https://github.com/smithery-ai) |
+| 17 | Glama | Auto-indexes ~37,000 open-source MCP servers from GitHub | Same problem as Smithery, at larger scale: bad servers in the index directly hurt users who install from it | X @glamaai | [x.com/glamaai](https://x.com/glamaai), [github.com/punkpeye](https://github.com/punkpeye) |
+| 18 | PulseMCP | MCP ecosystem newsletter and directory run by MCP Steering Committee members | Recommending a bad or malicious MCP server in the weekly digest burns the credibility their whole newsletter depends on | X @pulsemcp | [x.com/pulsemcp](https://x.com/pulsemcp), [github.com/pulsemcp](https://github.com/pulsemcp) |
+| 19 | Official MCP Registry | Canonical namespace registry that MCP clients read server listings from | It's the base layer every MCP client trusts by default; a malicious registered server is a supply-chain risk for all of them | GitHub Discussions | [github.com/modelcontextprotocol/registry](https://github.com/modelcontextprotocol/registry) (Discussions tab enabled) |
+| 20 | Google A2A Project | Agent2Agent (A2A) protocol for agent-to-agent task delegation, now under the Linux Foundation | Agents delegating work to other agents over A2A have no protocol-native way to know who's reliable before they delegate | GitHub Discussions | [github.com/a2aproject/A2A](https://github.com/a2aproject/A2A) (Discussions and Discord both referenced in the repo) |
+
+## Message Template
+
+Use as a starting point, adjust the bracketed part to name their actual
+product, keep it to three sentences, post it as a genuine question:
+
+> Hey, quick question, I'm not selling anything. I'm building a reputation
+> oracle for AI agents and trying to figure out if it solves a real problem
+> before I build more of it: when an agent on [their platform/registry] turns
+> out to be unreliable or a bad actor, how do you handle that today, a
+> blocklist, a manual review queue, something else? Genuinely just trying to
+> learn what already exists.
+
+## Decision Rubric
+
+- **2 or more replies** that describe an internal blocklist, a manual review
+  queue, or some other existing process for handling bad agents: that's real
+  demand. Proceed with the oracle as a product, and follow up with those
+  specific replies first.
+- **0 or 1 reply**, or replies that shrug it off as a non-problem: shelve the
+  demand-test thesis. Keep the oracle as a public reference implementation
+  (open source, documented, demoable) rather than building a go-to-market
+  plan around it.
+
+Anything in between (a couple of vague or lukewarm replies) means wait for
+day 3 before deciding rather than calling it early.
+
+## Tracking
+
+| Target | Sent date | Reply | Signal |
+|--------|-----------|-------|--------|
+| x402 Foundation | | | |
+| Coinbase AgentKit | | | |
+| x402 Bazaar | | | |
+| x402scan | | | |
+| PayAI Network | | | |
+| 8004scan (AltLayer) | | | |
+| RNWY | | | |
+| Veylux | | | |
+| Agent Arena (Vistara Labs) | | | |
+| ChaosChain | | | |
+| Virtuals Protocol | | | |
+| Olas (Autonolas) | | | |
+| Fetch.ai (Agentverse) | | | |
+| Skyfire | | | |
+| Nevermined | | | |
+| Smithery | | | |
+| Glama | | | |
+| PulseMCP | | | |
+| Official MCP Registry | | | |
+| Google A2A Project | | | |
+
+## Targets Considered and Dropped
+
+The `awesome-erc8004` community list surfaces 60+ additional named projects
+(reputation oracles, escrow protocols, agent passports, and similar). Most
+were dropped: single-commit repos with no real activity, generic
+copy-pasted descriptions, or no reachable channel beyond a personal GitHub
+handle with no history. Including them would pad the count without adding
+real signal. Supporting context, not a target: the paper "Can Trustless
+Agents Be Trusted? An Empirical Study of the ERC-8004 Decentralized AI Agent
+Ecosystem" ([arxiv.org/abs/2606.26028](https://arxiv.org/abs/2606.26028))
+measured Sybil-flagged reviewer rates of 59.2% to 90.6% across chains in the
+ERC-8004 Reputation Registry, worth citing if anyone asks why this matters.

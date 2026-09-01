@@ -89,6 +89,41 @@ describe('reputation router', () => {
       expect(res.body.receipt.oracleAddress).toBe(receiptService.oracleAddress);
     });
 
+    it('returns an identical vector and hash on a cache hit', async () => {
+      eventLog.ensureAgent(AGENT_ID);
+      eventLog.ensureAgent(SOURCE_AGENT_ID);
+      eventLog.appendEvent(makeEvent());
+
+      const first = await request(app).get(`/reputation/${AGENT_ID}`).expect(200);
+      const second = await request(app).get(`/reputation/${AGENT_ID}`).expect(200);
+
+      expect(second.body.vector).toEqual(first.body.vector);
+      expect(second.body.receipt.vectorHash).toBe(first.body.receipt.vectorHash);
+    });
+
+    it('discounts attestations from wallets with no history of their own', async () => {
+      const sybils: EvmAddress[] = [
+        '0x3333333333333333333333333333333333333333',
+        '0x4444444444444444444444444444444444444444',
+        '0x5555555555555555555555555555555555555555',
+      ];
+      eventLog.ensureAgent(AGENT_ID);
+      for (const sybil of sybils) eventLog.ensureAgent(sybil);
+
+      for (let i = 0; i < 35; i++) {
+        eventLog.appendEvent(makeEvent({
+          eventType: 'attestation',
+          sourceAgentId: sybils[i % 3]!,
+          data: { type: 'attestation', category: 'reliability', confidence: 1.0 },
+        }));
+      }
+
+      const res = await request(app).get(`/reputation/${AGENT_ID}`).expect(200);
+
+      expect(res.body.vector.reliabilityScore).toBeLessThan(0.7);
+      expect(res.body.vector.compositeScore).toBeLessThan(60);
+    });
+
     it('returns 400 for invalid address', async () => {
       const res = await request(app)
         .get('/reputation/not-an-address')

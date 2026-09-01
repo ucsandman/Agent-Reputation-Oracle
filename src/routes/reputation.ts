@@ -6,7 +6,7 @@ import { ReputationCache } from '../storage/cache.js';
 import { ReceiptService } from '../crypto/receipt.js';
 import { hashReputationVector } from '../crypto/signing.js';
 import { AttestationQuerySchema } from '../models/event.js';
-import type { EvmAddress, EventQueryOptions } from '../types/index.js';
+import type { EvmAddress, EventQueryOptions, ReputationEvent } from '../types/index.js';
 
 export function createReputationRouter(
   eventLog: EventLog,
@@ -122,7 +122,7 @@ export function createReputationRouter(
   return router;
 }
 
-function validateAddress(address: string | undefined): EvmAddress | null {
+export function validateAddress(address: string | undefined): EvmAddress | null {
   if (!address) return null;
   try {
     return getAddress(address) as EvmAddress;
@@ -131,7 +131,7 @@ function validateAddress(address: string | undefined): EvmAddress | null {
   }
 }
 
-function getOrComputeVector(
+export function getOrComputeVector(
   agentId: EvmAddress,
   eventLog: EventLog,
   cache: ReputationCache,
@@ -144,9 +144,30 @@ function getOrComputeVector(
 
   const events = eventLog.getEventsByAgent(agentId);
   const now = new Date();
-  const vector = engine.computeVector(events, now);
+  const vector = engine.computeVector(events, now, attesterWeights(events, eventLog, engine, now));
   const vectorHash = hashReputationVector(vector);
   cache.set(agentId, vector, vectorHash);
 
   return vector;
+}
+
+/**
+ * Weight each distinct attester by its own standing. One level deep: an attester's
+ * own vector is computed with unweighted attesters, so this never recurses.
+ */
+function attesterWeights(
+  events: ReputationEvent[],
+  eventLog: EventLog,
+  engine: ReputationEngine,
+  now: Date,
+): Map<EvmAddress, number> {
+  const weights = new Map<EvmAddress, number>();
+
+  for (const event of events) {
+    if (weights.has(event.sourceAgentId)) continue;
+    const attesterVector = engine.computeVector(eventLog.getEventsByAgent(event.sourceAgentId), now);
+    weights.set(event.sourceAgentId, engine.computeAttesterWeight(attesterVector));
+  }
+
+  return weights;
 }

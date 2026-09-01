@@ -5,7 +5,7 @@
 **Threat:** An attacker creates many identities to flood an agent with positive (or negative) reputation events.
 
 **Mitigations:**
-- **x402 payment cost.** Every event submission costs $0.01 USDC. Creating 1,000 fake attestations costs $10. This makes large-scale Sybil attacks economically unfeasible for low-value manipulation.
+- **Attester weighting.** Event submission is free by default (PRICE_EVENT_SUBMIT=0) to bootstrap data, so cost is not the Sybil defense. Each event is weighted by the attester's own standing (history and reliability), and any single attester's contribution is capped, so fresh wallets barely move a score. See docs/reputation-math.md. Operators can still set a nonzero price.
 - **Sublinear volume weight.** The volume weight uses `ln(1 + sum(w_i))`, which grows logarithmically. Doubling the number of events does not double the volume weight. 1,000 events yield a volume weight of ~6.9, while 10 events yield ~2.4 -- only a 2.9x difference for 100x the cost.
 - **Rate limiting.** Maximum 100 events per agent per hour. Sustained flooding requires time and ongoing cost.
 
@@ -58,7 +58,7 @@
 **Mitigations:**
 - **Sublinear volume weight.** `ln(1 + sum(w_i))` means diminishing returns. Going from 10 to 100 events increases volume weight from 2.4 to 4.6 -- less than 2x for 10x the events.
 - **Confidence ceiling.** `confidence = 1 - e^(-0.1 * volumeWeight)` asymptotes below 1.0. Even with 1,000 events, confidence is only ~0.50.
-- **Per-event cost.** At $0.01 per event, gaming volume costs real money: $1 for 100 events, $10 for 1,000 events.
+- **Per-event cost (optional).** With PRICE_EVENT_SUBMIT set, gaming volume costs real money: at $0.01, $1 for 100 events, $10 for 1,000 events. Default is free; attester weighting and the per-agent hourly rate limit carry the defense.
 - **Collusion discount.** If the volume gaming comes from a concentrated set of attesters, the distribution discount reduces all score dimensions.
 
 **Residual risk:** Moderate. An attacker can achieve higher confidence than legitimate but less active agents. The economic cost scales linearly while the benefit scales logarithmically, making this progressively less effective.

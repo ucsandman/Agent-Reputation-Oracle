@@ -76,9 +76,11 @@ export class EventLog {
   }
 
   countEventsByAgentSince(agentId: EvmAddress, since: string): number {
+    // created_at is SQLite datetime('now') format ('YYYY-MM-DD HH:MM:SS'); normalize ISO input to match.
+    const sqliteSince = since.replace('T', ' ').replace(/\.\d+Z?$/, '').replace(/Z$/, '');
     const row = this.db.prepare(
       'SELECT COUNT(*) as count FROM events WHERE agent_id = ? AND created_at >= ?'
-    ).get(agentId, since) as { count: number };
+    ).get(agentId, sqliteSince) as { count: number };
     return row.count;
   }
 

@@ -186,7 +186,7 @@ Valid `type` values: `transaction_completed`, `sla_verified`, `arbitration_resul
 
 Submit a signed reputation event for an agent.
 
-**Price:** $0.01
+**Price:** free by default (PRICE_EVENT_SUBMIT=0); when a price is set, x402 payment is required
 
 **Request body:**
 ```json

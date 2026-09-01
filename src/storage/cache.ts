@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { ReputationVector, EvmAddress, CachedReputation } from '../types/index.js';
+import { computeCompositeScore } from '../reputation/engine.js';
 
 export class ReputationCache {
   private db: Database.Database;
@@ -15,17 +16,24 @@ export class ReputationCache {
 
     if (!row) return null;
 
+    // compositeScore is derived, not stored; rebuilt here so a cached vector
+    // hashes identically to a freshly computed one.
+    const dims = {
+      reliabilityScore: row.reliability_score,
+      completionRate: row.completion_rate,
+      disputeRate: row.dispute_rate,
+      slaAdherence: row.sla_adherence,
+      volumeWeight: row.volume_weight,
+      totalEvents: row.total_events,
+      lastEventTimestamp: row.last_event_timestamp ?? '',
+      computedAt: row.last_computed_at,
+    };
+
     return {
       agentId: row.agent_id as EvmAddress,
       vector: {
-        reliabilityScore: row.reliability_score,
-        completionRate: row.completion_rate,
-        disputeRate: row.dispute_rate,
-        slaAdherence: row.sla_adherence,
-        volumeWeight: row.volume_weight,
-        totalEvents: row.total_events,
-        lastEventTimestamp: row.last_event_timestamp ?? '',
-        computedAt: row.last_computed_at,
+        ...dims,
+        compositeScore: computeCompositeScore(dims),
       },
       vectorHash: row.vector_hash,
       lastComputedAt: row.last_computed_at,

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The reputation vector is computed from an agent's full event history. Each event is time-weighted using exponential decay, and each scoring dimension uses a Bayesian average with informative priors to handle cold-start and low-data agents.
+The reputation vector is computed from an agent's full event history. Each event is time-weighted using exponential decay and by the standing of the attester who submitted it, and each scoring dimension uses a Bayesian average with informative priors to handle cold-start and low-data agents.
 
 ## Exponential Time Decay
 
@@ -36,7 +36,7 @@ score = (prior_w * prior_v + SUM(w_i * x_i)) / (prior_w + SUM(w_i))
 Where:
 - `prior_w` = prior weight (pseudo-count, controls strength of prior)
 - `prior_v` = prior value (default assumption before data)
-- `w_i` = decay weight for event i
+- `w_i` = weight for event i = `decayWeight(i) * attesterWeight(source_i)`, then capped per attester (see below)
 - `x_i` = observed value for event i (0.0 to 1.0)
 
 The prior acts as a regularizer: with zero events, the score equals `prior_v`. As events accumulate, the prior is diluted by real data.
@@ -103,9 +103,9 @@ Not a Bayesian average. Uses sublinear (logarithmic) growth:
 volumeWeight = ln(1 + SUM(w_i))
 ```
 
-Where `w_i` is the decay weight for every event (all types). This prevents gaming through high-volume low-quality submissions.
+Where `w_i` is the weight for every event (all types), attester-weighted and capped like every other dimension. This prevents gaming through high-volume low-quality submissions.
 
-**Growth curve:**
+**Growth curve** (assuming enough distinct full-weight attesters that no cap binds):
 - 1 recent event: `ln(2)` = 0.69
 - 10 recent events: `ln(11)` = 2.40
 - 100 recent events: `ln(101)` = 4.62
@@ -129,25 +129,44 @@ confidence = 1 - e^(-0.1 * volumeWeight)
 | 4.62 (100 events) | 0.370 |
 | 6.91 (1000 events) | 0.499 |
 
-## Collusion Discount
+### 7. Composite Score
 
-After computing raw scores, a collusion discount is applied based on attester distribution.
-
-**Attester concentration:** For each agent, count events per `sourceAgentId`. The maximum ratio is `max(count_i / totalEvents)`.
-
-| Max Ratio | Discount Factor |
-|-----------|-----------------|
-| > 0.8     | 0.1 (heavy penalty) |
-| > 0.5     | 0.5 (moderate penalty) |
-| <= 0.5    | 1.0 (no penalty) |
-
-**Application:** The discount pulls each score toward its prior:
+A single integer 0-100 for callers that want one number instead of five.
 
 ```
-adjusted = prior + (raw - prior) * discount
+blend = 0.40 * reliability + 0.25 * completion + 0.20 * (1 - disputeRate) + 0.15 * slaAdherence
+compositeScore = round(100 * (0.5 + (blend - 0.5) * confidence))
 ```
 
-At `discount = 1.0`, the score is unchanged. At `discount = 0.1`, the score moves 90% toward the prior.
+Dispute rate is inverted because lower is better. The blend is pulled toward 50 by `(1 - confidence)`, so an agent nobody has vouched for reads as "unknown" (50) rather than "good". An agent with zero events scores exactly 50.
+
+## Attester Weighting
+
+Every event is submitted by an attester (`sourceAgentId`). Testimony counts in proportion to the attester's own standing:
+
+```
+attesterWeight = 0.1 + 0.9 * confidence(attester) * reliability(attester)
+```
+
+The attester's own vector is computed from the attester's own events with all attesters unweighted. This is one level deep and never recurses.
+
+- **Floor 0.1:** a brand-new wallet still counts, but only a tenth as much as a fully established one. Sybil wallets are cheap to mint and stay at the floor.
+- The attester weight multiplies the decay weight, so a fresh wallet's 35 attestations carry as much evidence as 3.5 attestations from a full-weight attester.
+
+## Attester Diversity Caps
+
+Weighting alone is not enough: a large enough ring of fresh wallets still adds up. So each attester's total contribution to a dimension is capped:
+
+```
+cap = min(8 * attesterWeight, 0.5 * totalWeightForThatDimension)
+```
+
+An attester over its cap has all of its events for that dimension scaled down proportionally.
+
+- **8 events-worth, scaled by attester weight.** Three fresh wallets (weight 0.1) contribute at most `3 * 0.8 = 2.4` against a reliability prior of 5, which is not enough to move the score or to raise confidence above 0.12. One well-established attester (weight ~0.9) still contributes 7.2, which does carry a real score.
+- **50% of a dimension's evidence.** No single attester is ever more than half the story, however good its own standing.
+
+Together these mean a high score requires several credible attesters. This replaces the earlier max-share collusion discount, which penalised honest repeat business (an agent with 100 successful transactions from one loyal customer was pulled down to 0.55) while letting a sybil ring through (three throwaway wallets posting 35 attestations reached 0.94). Under the current rules those two cases score 0.80 and 0.66.
 
 ## Worked Example
 
@@ -157,7 +176,7 @@ At `discount = 1.0`, the score is unchanged. At `discount = 0.1`, the score move
 2. `transaction_completed`, success = true (w=1.0, x=1.0)
 3. `sla_verified`, metSla = true (w=1.0, x=1.0)
 
-Events are from 2 different attesters (60/40 split), so collusion discount = 1.0.
+Event 1 is from attester X; events 2 and 3 are from attester Y. Both are established, so both carry `attesterWeight = 1.0`.
 
 **Reliability** (prior_w=5, prior_v=0.5):
 Only events 1 and 2 contribute.
@@ -186,22 +205,29 @@ score = (5 * 0.05 + 1.0 * 0.0 + 1.0 * 0.0) / (5 + 1.0 + 1.0)
 ```
 
 **SLA Adherence** (prior_w=2, prior_v=0.8):
-Event 3 contributes.
+Event 3 is the only SLA event, so Y is 100% of this dimension's evidence and is capped at 50% of it (`0.5 * 1.0 = 0.5`).
 ```
-score = (2 * 0.8 + 1.0 * 1.0) / (2 + 1.0)
-      = (1.6 + 1.0) / 3.0
-      = 2.6 / 3.0
-      = 0.867
+score = (2 * 0.8 + 0.5 * 1.0) / (2 + 0.5)
+      = (1.6 + 0.5) / 2.5
+      = 2.1 / 2.5
+      = 0.840
 ```
 
 **Volume Weight:**
+Y supplied 2 of the 3 events, so Y is capped at `0.5 * 3.0 = 1.5`; X's single event passes through.
 ```
-volumeWeight = ln(1 + 1.0 + 1.0 + 1.0) = ln(4) = 1.386
+volumeWeight = ln(1 + 1.0 + 1.5) = ln(3.5) = 1.253
 ```
 
 **Confidence:**
 ```
-confidence = 1 - e^(-0.1 * 1.386) = 1 - e^(-0.1386) = 1 - 0.871 = 0.129
+confidence = 1 - e^(-0.1 * 1.253) = 1 - e^(-0.1253) = 1 - 0.882 = 0.118
+```
+
+**Composite Score:**
+```
+blend = 0.40 * 0.643 + 0.25 * 0.820 + 0.20 * (1 - 0.036) + 0.15 * 0.840 = 0.781
+composite = round(100 * (0.5 + (0.781 - 0.5) * 0.118)) = 53
 ```
 
 **Final vector:**
@@ -210,11 +236,12 @@ confidence = 1 - e^(-0.1 * 1.386) = 1 - e^(-0.1386) = 1 - 0.871 = 0.129
   "reliabilityScore": 0.643,
   "completionRate": 0.820,
   "disputeRate": 0.036,
-  "slaAdherence": 0.867,
-  "volumeWeight": 1.386,
+  "slaAdherence": 0.840,
+  "volumeWeight": 1.253,
   "totalEvents": 3,
-  "confidence": 0.129
+  "compositeScore": 53,
+  "confidence": 0.118
 }
 ```
 
-Interpretation: Good early signals, but low confidence due to limited history.
+Interpretation: Good early signals, but low confidence due to limited history and only two attesters.

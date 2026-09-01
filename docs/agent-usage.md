@@ -75,7 +75,7 @@ curl -H "X-PAYMENT: <x402-payment-proof>" \
 
 ## 4. Submit a Reputation Event
 
-**Cost:** $0.01 USDC
+**Cost:** free by default (PRICE_EVENT_SUBMIT=0); operators may set a price
 
 ### Step 4a: Construct the Event
 

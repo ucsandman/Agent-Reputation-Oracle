@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "demo": "tsx scripts/demo.ts",
     "seed": "tsx scripts/seed.ts",
-    "replay": "tsx scripts/replay.ts"
+    "replay": "tsx scripts/replay.ts",
+    "index:erc8004": "tsx --env-file=.env scripts/index-erc8004.ts"
   },
   "keywords": [
     "x402",

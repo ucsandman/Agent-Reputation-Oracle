@@ -13,6 +13,7 @@ export interface ReputationVector {
   totalEvents: number;
   lastEventTimestamp: string;
   computedAt: string;
+  compositeScore: number;
 }
 
 // ─── Reputation Events ───
@@ -109,6 +110,7 @@ export interface ReputationSummary {
   disputeRate: number;
   slaAdherence: number;
   volumeWeight: number;
+  compositeScore: number;
   totalEvents: number;
   isActive: boolean;
   confidence: number;

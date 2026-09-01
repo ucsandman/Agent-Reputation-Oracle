@@ -8,35 +8,14 @@ import {
 import { isWithinActiveWindow, type DecayConfig, DEFAULT_DECAY_CONFIG } from './decay.js';
 import type { ReputationEvent, ReputationVector, ReputationSummary, EvmAddress } from '../types/index.js';
 
-// ─── Collusion Detection ───
+// ─── Attester Weighting ───
 
-interface CollusionWeights {
-  attesterDistribution: Map<string, number>;
-  totalEvents: number;
-}
+// A brand-new wallet still counts a little, but a well-regarded attester counts
+// up to 10x more. Sybil rings are cheap to mint and therefore stay near the floor.
+const ATTESTER_WEIGHT_FLOOR = 0.1;
 
-function computeCollusionDiscount(distribution: CollusionWeights): number {
-  if (distribution.totalEvents === 0) return 1.0;
-
-  let maxRatio = 0;
-  for (const count of distribution.attesterDistribution.values()) {
-    const ratio = count / distribution.totalEvents;
-    if (ratio > maxRatio) maxRatio = ratio;
-  }
-
-  if (maxRatio > 0.8) return 0.1;
-  if (maxRatio > 0.5) return 0.5;
-  return 1.0;
-}
-
-function getAttesterDistribution(events: ReputationEvent[]): CollusionWeights {
-  const distribution = new Map<string, number>();
-  for (const event of events) {
-    const current = distribution.get(event.sourceAgentId) ?? 0;
-    distribution.set(event.sourceAgentId, current + 1);
-  }
-  return { attesterDistribution: distribution, totalEvents: events.length };
-}
+// Composite blend. Dispute is inverted (lower is better); weights sum to 1.
+const COMPOSITE_WEIGHTS = { reliability: 0.4, completion: 0.25, dispute: 0.2, sla: 0.15 };
 
 // ─── Reputation Engine ───
 
@@ -47,30 +26,23 @@ export class ReputationEngine {
     this.decayConfig = decayConfig;
   }
 
-  computeVector(events: ReputationEvent[], now: Date = new Date()): ReputationVector {
-    const collusionDiscount = computeCollusionDiscount(getAttesterDistribution(events));
-
-    // Apply collusion discount by reducing event weights conceptually.
-    // We pass all events and let the math functions apply decay.
-    // Collusion discount is applied post-computation.
-    const rawReliability = computeReliability(events, now, this.decayConfig);
-    const rawCompletion = computeCompletionRate(events, now, this.decayConfig);
-    const rawDispute = computeDisputeRate(events, now, this.decayConfig);
-    const rawSla = computeSlaAdherence(events, now, this.decayConfig);
-    const volumeWeight = computeVolumeWeight(events, now, this.decayConfig);
-
-    // Apply collusion discount: pull scores toward their priors
-    const reliability = applyDiscount(rawReliability, 0.5, collusionDiscount);
-    const completionRate = applyDiscount(rawCompletion, 0.7, collusionDiscount);
-    const disputeRate = applyDiscount(rawDispute, 0.05, collusionDiscount);
-    const slaAdherence = applyDiscount(rawSla, 0.8, collusionDiscount);
+  computeVector(
+    events: ReputationEvent[],
+    now: Date = new Date(),
+    attesterWeights?: Map<EvmAddress, number>,
+  ): ReputationVector {
+    const reliabilityScore = computeReliability(events, now, this.decayConfig, attesterWeights);
+    const completionRate = computeCompletionRate(events, now, this.decayConfig, attesterWeights);
+    const disputeRate = computeDisputeRate(events, now, this.decayConfig, attesterWeights);
+    const slaAdherence = computeSlaAdherence(events, now, this.decayConfig, attesterWeights);
+    const volumeWeight = computeVolumeWeight(events, now, this.decayConfig, attesterWeights);
 
     const lastEvent = events.length > 0
       ? events.reduce((latest, e) => e.timestamp > latest.timestamp ? e : latest, events[0]!)
       : null;
 
     return {
-      reliabilityScore: reliability,
+      reliabilityScore,
       completionRate,
       disputeRate,
       slaAdherence,
@@ -78,7 +50,20 @@ export class ReputationEngine {
       totalEvents: events.length,
       lastEventTimestamp: lastEvent?.timestamp ?? '',
       computedAt: now.toISOString(),
+      compositeScore: computeComposite(
+        { reliabilityScore, completionRate, disputeRate, slaAdherence },
+        confidenceFrom(volumeWeight),
+      ),
     };
+  }
+
+  /**
+   * Weight an attester's testimony by its own standing (one level deep, no recursion).
+   * A wallet with no history of its own sits at the floor.
+   */
+  computeAttesterWeight(attesterVector: ReputationVector): number {
+    return ATTESTER_WEIGHT_FLOOR
+      + (1 - ATTESTER_WEIGHT_FLOOR) * this.computeConfidence(attesterVector) * attesterVector.reliabilityScore;
   }
 
   computeSummary(agentId: EvmAddress, vector: ReputationVector): ReputationSummary {
@@ -89,6 +74,7 @@ export class ReputationEngine {
       disputeRate: vector.disputeRate,
       slaAdherence: vector.slaAdherence,
       volumeWeight: vector.volumeWeight,
+      compositeScore: vector.compositeScore,
       totalEvents: vector.totalEvents,
       isActive: this.isActive(vector),
       confidence: this.computeConfidence(vector),
@@ -103,16 +89,35 @@ export class ReputationEngine {
   }
 
   computeConfidence(vector: ReputationVector): number {
-    // confidence = 1 - e^(-0.1 * volumeWeight), range [0,1)
-    return 1 - Math.exp(-0.1 * vector.volumeWeight);
+    return confidenceFrom(vector.volumeWeight);
   }
 }
 
 /**
- * Apply collusion discount by pulling score toward prior.
- * At discount=1.0 (no collusion), score is unchanged.
- * At discount=0.1 (heavy collusion), score moves 90% toward prior.
+ * confidence = 1 - e^(-0.1 * volumeWeight), range [0,1)
  */
-function applyDiscount(score: number, prior: number, discount: number): number {
-  return prior + (score - prior) * discount;
+function confidenceFrom(volumeWeight: number): number {
+  return 1 - Math.exp(-0.1 * volumeWeight);
+}
+
+/**
+ * Composite 0-100 score. The dimension blend is pulled toward 50 by (1 - confidence),
+ * so an agent nobody has vouched for reads as "unknown", not "good".
+ * Derived purely from the other fields, so a cached vector can rebuild it.
+ */
+export function computeCompositeScore(vector: Omit<ReputationVector, 'compositeScore'>): number {
+  return computeComposite(vector, confidenceFrom(vector.volumeWeight));
+}
+
+function computeComposite(
+  dims: Pick<ReputationVector, 'reliabilityScore' | 'completionRate' | 'disputeRate' | 'slaAdherence'>,
+  confidence: number,
+): number {
+  const blend =
+    COMPOSITE_WEIGHTS.reliability * dims.reliabilityScore
+    + COMPOSITE_WEIGHTS.completion * dims.completionRate
+    + COMPOSITE_WEIGHTS.dispute * (1 - dims.disputeRate)
+    + COMPOSITE_WEIGHTS.sla * dims.slaAdherence;
+
+  return Math.round(100 * (0.5 + (blend - 0.5) * confidence));
 }

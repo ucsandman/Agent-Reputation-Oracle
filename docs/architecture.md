@@ -48,7 +48,7 @@ src/
       v                                      |
  +----------+    x402 payment    +-----------+----------+
  |  POST    | -----------------> |                      |
- | /event   |    $0.01 USDC     |   x402 Middleware     |
+ | /event   |   free (default)  |   x402 Middleware     |
  +----------+                   |   (facilitator)       |
       |                         +-----------+----------+
       |                                     |
@@ -111,7 +111,7 @@ All endpoints except `GET /v1/health` are gated by the `@x402/express` payment m
 | `GET /v1/reputation/:agentId`         | $0.001      |
 | `GET /v1/reputation/:agentId/summary` | $0.0005     |
 | `GET /v1/reputation/:agentId/attestations` | $0.001 |
-| `POST /v1/reputation/event`           | $0.01       |
+| `POST /v1/reputation/event`           | free (default) |
 
 Payments are sent to the address configured in `X402_PAY_TO`. The scheme is `exact` (EVM exact payment via `@x402/evm`).
 

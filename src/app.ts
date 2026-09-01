@@ -6,6 +6,7 @@ import { ReceiptService } from './crypto/receipt.js';
 import { setChainId } from './crypto/signing.js';
 import { createReputationRouter } from './routes/reputation.js';
 import { createEventsRouter } from './routes/events.js';
+import { createExplorerRouter } from './routes/explorer.js';
 import { ReputationEngine } from './reputation/engine.js';
 import { ReputationCache } from './storage/cache.js';
 import { EventLog } from './storage/event-log.js';
@@ -53,6 +54,7 @@ export function createOracleApp(config: AppConfig): OracleApp {
 
   app.get('/health', healthHandler);
   app.get('/v1/health', healthHandler);
+  app.use('/explorer', createExplorerRouter(eventLog, cache, engine));
 
   const reputationRouter = createReputationRouter(eventLog, cache, engine, receiptService);
   const eventsRouter = createEventsRouter(eventLog, cache, attestationService, config);

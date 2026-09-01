@@ -3,7 +3,7 @@ import type { AppConfig, EvmAddress } from './types/index.js';
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3402),
-  NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+  NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
 
   X402_NETWORK: z.string().default('eip155:84532'),
   X402_PAY_TO: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
@@ -14,7 +14,7 @@ const ConfigSchema = z.object({
   PRICE_REPUTATION_QUERY: z.string().default('0.001'),
   PRICE_REPUTATION_SUMMARY: z.string().default('0.0005'),
   PRICE_ATTESTATION_QUERY: z.string().default('0.001'),
-  PRICE_EVENT_SUBMIT: z.string().default('0.01'),
+  PRICE_EVENT_SUBMIT: z.string().default('0'),
 
   DB_PATH: z.string().default('./data/reputation.db'),
 

@@ -1,27 +1,87 @@
 # Agent Reputation Oracle
 
-Protocol-native reputation for autonomous AI agents.
+A reputation service for AI agents, built for a world where agents hire,
+pay, and delegate to other agents without a human checking first.
 
-Agent Reputation Oracle lets agents submit signed reputation events, query an
-agent's computed reputation vector, and verify oracle-signed receipts. The
-service is designed for x402-native agent economies where reputation reads and
-writes can be paid for directly by the calling agent.
+Other agents submit signed events about an agent: a job completed, an SLA
+met, an arbitration result, a slash, or a general attestation. The oracle
+stores every event in an append-only log and computes five decayed
+reputation scores plus one composite 0-100 score, weighted so that no single
+attester or fresh batch of sock-puppet wallets can move the needle much.
+Every full query returns an EIP-712 signed receipt you can verify offline,
+independent of the oracle. Reads cost a fraction of a cent in x402
+micropayments; submitting events is free by default, to get real data
+flowing before charging for it. A browser explorer at `/explorer` lets a
+human look up any agent's score, and an ERC-8004 importer pulls in on-chain
+agent feedback as another data source. Not deployed anywhere yet, this is a
+working local implementation.
 
-## Why This Exists
+## Quickstart
 
-Autonomous agents need a way to decide whether another agent is worth trusting
-before they delegate work, pay for a task, or accept an offer. Wallet addresses
-give agents identity, but not history. This oracle turns signed interaction
-events into portable reputation signals:
+```bash
+git clone git@github.com:ucsandman/Agent-Reputation-Oracle.git && cd Agent-Reputation-Oracle
+npm install
+cp .env.example .env   # add your wallet private key and pay-to address
+npm run dev
+npm run demo            # separate terminal: submits events, queries, verifies a receipt
+```
 
-- **Signed inputs:** attesters sign EIP-712 reputation events.
-- **Append-only history:** accepted events are stored in SQLite with WAL mode.
-- **Deterministic scoring:** reputation is recomputed from the event log using
-  decay, Bayesian priors, and volume weighting.
-- **Verifiable outputs:** every full reputation query returns an EIP-712 signed
-  receipt containing a hash of the computed vector.
-- **x402-native access:** paid endpoints can require x402 micropayments in
-  production.
+## What You Get Back
+
+```bash
+curl http://localhost:3402/v1/reputation/0x1234567890abcdef1234567890abcdef12345678
+```
+
+```json
+{
+  "agentId": "0x1234567890abcdef1234567890abcdef12345678",
+  "vector": {
+    "reliabilityScore": 0.643,
+    "completionRate": 0.820,
+    "disputeRate": 0.036,
+    "slaAdherence": 0.867,
+    "volumeWeight": 1.386,
+    "compositeScore": 54,
+    "totalEvents": 3,
+    "lastEventTimestamp": "2025-01-15T09:00:00.000Z",
+    "computedAt": "2025-01-15T10:30:00.000Z"
+  },
+  "receipt": {
+    "agentId": "0x1234567890abcdef1234567890abcdef12345678",
+    "vectorHash": "0xabc123...",
+    "signature": "0xdef456...",
+    "timestamp": "2025-01-15T10:30:00.000Z",
+    "oracleAddress": "0xOracleAddress"
+  }
+}
+```
+
+`compositeScore` blends the five underlying scores into one 0-100 number,
+pulled toward 50 when there isn't enough history to be confident about it.
+54 here reflects low confidence from only 3 events, not a mediocre agent.
+The `receipt` lets any caller confirm the oracle actually returned this
+exact vector, without trusting the oracle operator at read time. See
+[docs/api-spec.md](./docs/api-spec.md) for every field.
+
+## Why Sybil-Resistance and Receipts Matter
+
+ERC-8004, the emerging on-chain standard for agent identity, reached
+Ethereum mainnet in January 2026 with more than 45,000 agents registered.
+A study of its Reputation Registry found that 59 to 91 percent of feedback,
+depending on the chain, looked like coordinated Sybil behavior: agents or
+their owners writing themselves fake reviews. Raw on-chain feedback is not
+a trust signal by itself.
+
+This oracle weights every event by the submitting agent's own standing and
+caps how much any single attester can move a score, so a batch of fresh
+wallets barely changes the result. Scores are also fully reproducible: given
+the same event log, anyone gets the same numbers, and the signed receipt
+proves the oracle didn't quietly change them for one caller.
+
+Full documentation lives in [docs/](./docs/), including the
+[reputation math](./docs/reputation-math.md), the
+[threat model](./docs/threat-model.md), and the
+[ERC-8004 importer](./docs/erc8004.md).
 
 ## Prerequisites
 
@@ -73,10 +133,21 @@ exercised locally.
 | GET | `/v1/reputation/:agentId` | $0.001 | Full reputation vector + signed receipt |
 | GET | `/v1/reputation/:agentId/summary` | $0.0005 | Lightweight reputation summary |
 | GET | `/v1/reputation/:agentId/attestations` | $0.001 | Paginated event history |
-| POST | `/v1/reputation/event` | $0.01 | Submit signed reputation event |
+| POST | `/v1/reputation/event` | Free by default | Submit signed reputation event (`PRICE_EVENT_SUBMIT`, default `0`) |
+| GET | `/explorer` and `/explorer/:agentId` | Free | Human-readable browser view of an agent's score and event history |
 
 Full endpoint details are in [docs/api-spec.md](./docs/api-spec.md).
 Unversioned routes are still mounted as backward-compatible aliases.
+
+## ERC-8004 Importer
+
+`npm run index:erc8004` reads `NewFeedback` events from an ERC-8004
+Reputation Registry on chain and appends them to the event log as
+attestations, so the oracle has real data before any agent submits a single
+event through the API. It's read-only, idempotent, and resumes from a
+stored cursor on re-run. See [docs/erc8004.md](./docs/erc8004.md) for
+supported chains, contract addresses, and how on-chain values map to event
+fields.
 
 ## SDK
 
@@ -144,10 +215,13 @@ named volume, and exposes `/health` for container health checks.
 ## Architecture
 
 - **Storage**: SQLite with WAL mode, append-only event log
-- **Math**: Exponential decay with Bayesian averaging
+- **Math**: Exponential decay with Bayesian averaging, attester-weighted
+  composite 0-100 score
 - **Crypto**: EIP-712 typed data signatures via viem
 - **Payments**: x402 protocol with Coinbase facilitator
 - **Network**: Base Sepolia (configurable)
+- **On-chain data**: ERC-8004 Reputation Registry importer
+- **Explorer**: Server-rendered browser UI at `/explorer`
 
 More detail:
 
@@ -155,6 +229,8 @@ More detail:
 - [Reputation math](./docs/reputation-math.md)
 - [Agent usage guide](./docs/agent-usage.md)
 - [Demo walkthrough](./docs/demo.md)
+- [ERC-8004 importer](./docs/erc8004.md)
+- [Threat model](./docs/threat-model.md)
 
 ## License
 

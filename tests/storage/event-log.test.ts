@@ -231,3 +231,22 @@ describe('EventLog', () => {
     });
   });
 });
+
+describe('countEventsByAgentSince', () => {
+  let log: EventLog;
+  beforeEach(() => { log = new EventLog(':memory:'); log.ensureAgent(AGENT_ID); log.ensureAgent(SOURCE_AGENT_ID); });
+  afterEach(() => log.close());
+
+  it('counts events appended in the last hour when given an ISO timestamp', () => {
+    log.appendEvent(makeEvent());
+    log.appendEvent(makeEvent());
+    const oneHourAgo = new Date(Date.now() - 3600_000).toISOString();
+    expect(log.countEventsByAgentSince(AGENT_ID, oneHourAgo)).toBe(2);
+  });
+
+  it('returns 0 for a future cutoff', () => {
+    log.appendEvent(makeEvent());
+    const future = new Date(Date.now() + 3600_000).toISOString();
+    expect(log.countEventsByAgentSince(AGENT_ID, future)).toBe(0);
+  });
+});

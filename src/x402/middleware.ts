@@ -109,5 +109,11 @@ export function createPaymentMiddleware(config: AppConfig) {
     },
   };
 
+  // Free writes (price 0) bootstrap the data flywheel: drop the submit routes so x402 never gates them.
+  if (Number(config.pricing.eventSubmit) === 0) {
+    delete (routes as Record<string, unknown>)['POST /v1/reputation/event'];
+    delete (routes as Record<string, unknown>)['POST /reputation/event'];
+  }
+
   return paymentMiddleware(routes, server, undefined, undefined, config.x402.syncOnStart);
 }

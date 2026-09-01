@@ -202,6 +202,76 @@ describe('ReputationEngine', () => {
     });
   });
 
+  describe('attester weighting (sybil resistance)', () => {
+    // What computeAttesterWeight returns for a wallet with no history of its own.
+    const FRESH_WEIGHT = 0.1;
+
+    it('gives a fresh wallet the floor weight and a strong attester much more', () => {
+      const freshWeight = engine.computeAttesterWeight(engine.computeVector([], NOW));
+      expect(freshWeight).toBeCloseTo(FRESH_WEIGHT, 5);
+
+      const strongHistory = Array.from({ length: 200 }, (_, i) =>
+        makeEvent({
+          sourceAgentId: [SOURCE_A, SOURCE_B, SOURCE_C][i % 3]!,
+          data: {
+            type: 'transaction_completed',
+            completedSuccessfully: true,
+            valueUsd: 100,
+            durationMs: 5000,
+          },
+        }),
+      );
+      const strongWeight = engine.computeAttesterWeight(engine.computeVector(strongHistory, NOW));
+      expect(strongWeight).toBeGreaterThan(freshWeight * 2);
+      expect(strongWeight).toBeLessThanOrEqual(1);
+    });
+
+    it('does not let 3 fresh wallets vouch an agent to a high score', () => {
+      const sybils = [SOURCE_A, SOURCE_B, SOURCE_C];
+      const events = Array.from({ length: 35 }, (_, i) =>
+        makeEvent({
+          sourceAgentId: sybils[i % 3]!,
+          data: { type: 'attestation', category: 'reliability', confidence: 1.0 },
+        }),
+      );
+      const weights = new Map<EvmAddress, number>(sybils.map((s) => [s, FRESH_WEIGHT]));
+
+      const vector = engine.computeVector(events, NOW, weights);
+      const summary = engine.computeSummary(AGENT_ID, vector);
+
+      expect(vector.reliabilityScore).toBeLessThan(0.7);
+      expect(summary.confidence).toBeLessThan(0.2);
+    });
+
+    it('still credits an honest agent vouched by one well-established attester', () => {
+      const events = Array.from({ length: 100 }, () =>
+        makeEvent({
+          sourceAgentId: SOURCE_A,
+          data: {
+            type: 'transaction_completed',
+            completedSuccessfully: true,
+            valueUsd: 100,
+            durationMs: 5000,
+          },
+        }),
+      );
+      const weights = new Map<EvmAddress, number>([[SOURCE_A, 0.9]]);
+
+      const vector = engine.computeVector(events, NOW, weights);
+
+      expect(vector.reliabilityScore).toBeGreaterThan(0.75);
+    });
+  });
+
+  describe('compositeScore', () => {
+    it('sits near 50 for an agent with no events', () => {
+      const vector = engine.computeVector([], NOW);
+      expect(vector.compositeScore).toBeGreaterThan(45);
+      expect(vector.compositeScore).toBeLessThan(55);
+      expect(Number.isInteger(vector.compositeScore)).toBe(true);
+    });
+  });
+
   describe('computeSummary', () => {
     it('returns summary with isActive and confidence', () => {
       const vector = engine.computeVector([], NOW);
