@@ -67,16 +67,16 @@ day 3 before deciding rather than calling it early.
 
 | Target | Sent date | Reply | Signal |
 |--------|-----------|-------|--------|
-| x402 Foundation | | | |
-| Coinbase AgentKit | | | |
+| x402 Foundation | 2026-09-01 (https://github.com/x402-foundation/x402/issues/3345) | | |
+| Coinbase AgentKit | 2026-09-01 (https://github.com/coinbase/agentkit/issues/1476) | | |
 | x402 Bazaar | | | |
 | x402scan | | | |
 | PayAI Network | | | |
 | 8004scan (AltLayer) | | | |
 | RNWY | | | |
-| Veylux | | | |
+| Veylux | 2026-09-01 (https://github.com/kenjimoto999/veylux/issues/1) | | |
 | Agent Arena (Vistara Labs) | | | |
-| ChaosChain | | | |
+| ChaosChain | 2026-09-01 (https://github.com/ChaosChain/trustless-agents-erc-ri/issues/20) | | |
 | Virtuals Protocol | | | |
 | Olas (Autonolas) | | | |
 | Fetch.ai (Agentverse) | | | |
@@ -85,8 +85,8 @@ day 3 before deciding rather than calling it early.
 | Smithery | | | |
 | Glama | | | |
 | PulseMCP | | | |
-| Official MCP Registry | | | |
-| Google A2A Project | | | |
+| Official MCP Registry | 2026-09-01 (https://github.com/modelcontextprotocol/registry/discussions/1603) | | |
+| Google A2A Project | 2026-09-01 (https://github.com/a2aproject/A2A/discussions/2201) | | |
 
 ## Targets Considered and Dropped
 
@@ -100,3 +100,52 @@ Agents Be Trusted? An Empirical Study of the ERC-8004 Decentralized AI Agent
 Ecosystem" ([arxiv.org/abs/2606.26028](https://arxiv.org/abs/2606.26028))
 measured Sybil-flagged reviewer rates of 59.2% to 90.6% across chains in the
 ERC-8004 Reputation Registry, worth citing if anyone asks why this matters.
+
+## Ready to Paste (X and Discord)
+
+Posted from GitHub on 2026-09-01: the six rows above. The rest need a logged-in
+X or Discord session. Each block below is the exact text, tailored per target.
+Reply on their own post or in their general channel, one per day at most for
+X so it does not read as spam.
+
+**@CoinbaseDev (reply to the Bazaar launch thread, x.com/CoinbaseDev/status/1965445897489428869)**
+> Quick question, not selling anything. When a service listed in the Bazaar turns out to be broken or malicious and an agent loses USDC calling it, how is that handled today? Blocklist, manual review, nothing yet? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@x402scan**
+> Quick question, not selling anything. When you see spoofed or wash-traded x402 payments in the explorer data, how do you handle it today? Filter list, manual review, or does it just show up as activity? Building an open source reputation oracle for agents and trying to learn what already exists.
+
+**@PayAINetwork**
+> Quick question, not selling anything. When an agent paying through PayAI turns out to be a bad actor or wash-trading volume, how do you handle that today? Blocklist, manual review, something else? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@8004_scan**
+> Quick question, not selling anything. With Sybil feedback rates in the ERC-8004 reputation registry measured at 59 to 91 percent, how does 8004scan handle garbage feedback today? Filter, weighting, show it raw? Building an open source attester-weighted scorer on top of the registry and trying to learn what already exists.
+
+**@RNWY_official**
+> Quick question, not selling anything. When the underlying ERC-8004 feedback for an agent is Sybil-polluted, how does RNWY handle that in its trust score today? Building an open source attester-weighted scorer and genuinely curious what approach you landed on.
+
+**@vistaralabs (Agent Arena)**
+> Quick question, not selling anything. When an agent in the Agent Arena registry turns out to be unreliable or a bad actor, how do you handle that today? Blocklist, review queue, nothing yet? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**Virtuals Discord (general or ACP channel) / @virtuals_io**
+> Hey, quick question, not selling anything. When an agent hired through ACP takes the escrowed job and does not deliver, how is that handled today? Blocklist, manual review, dispute flow? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**Olas Discord (general)**
+> Hey, quick question, not selling anything. When an agent hired through the Olas marketplace turns out to be unreliable, how is that handled today? Blocklist, review queue, something else? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@Fetch_ai**
+> Quick question, not selling anything. When an agent surfaced in the Agentverse marketplace turns out to be a bad actor, how is that handled today? Blocklist, manual review, reports? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@trySkyfire**
+> Quick question, not selling anything. When a KYA-verified agent later turns out to be a bad actor, how does Skyfire handle that today? Revocation, review queue, something else? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@Nevermined_io / Nevermined Discord**
+> Quick question, not selling anything. At 1M+ agent transactions, how do you handle disputes caused by unreliable agents today? Blocklist, manual review, chargeback flow? Building an open source agent reputation oracle and trying to learn what already exists.
+
+**@SmitheryDotAI**
+> Quick question, not selling anything. When a listed MCP server turns out to be broken or malicious, how does Smithery handle it today? Delist, manual review, reports? Building an open source reputation layer for agents and servers and trying to learn what already exists.
+
+**@glamaai**
+> Quick question, not selling anything. With 37k auto-indexed MCP servers, how do you handle a malicious or broken one today? Delist, flag, manual review? Building an open source reputation layer for agents and servers and trying to learn what already exists.
+
+**@pulsemcp**
+> Quick question, not selling anything. Before you feature an MCP server in the digest, how do you check it is not broken or malicious, and what happens if one turns out bad later? Building an open source reputation layer for agents and servers and trying to learn what already exists.
