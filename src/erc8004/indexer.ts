@@ -74,7 +74,8 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     .prepare('SELECT last_block FROM erc8004_cursor WHERE key = ?')
     .get(cursorKey) as { last_block: number } | undefined;
 
-  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000, retryCount: 1 }));
+  // batch: concurrent calls within 10ms collapse into one JSON-RPC batch request.
+  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000, retryCount: 1, batch: { batchSize: 50, wait: 10 } }));
   const client = createPublicClient({ transport: transports.length > 1 ? fallback(transports) : transports[0]! });
   const latest = opts.toBlock ?? (await client.getBlockNumber());
   const start = cursorRow ? BigInt(cursorRow.last_block) + 1n : (opts.fromBlock ?? 0n);
@@ -83,17 +84,17 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
   if (start > latest) return result;
 
   const owners = new Map<string, EvmAddress>();
+  const burned = new Set<string>();
   const blockTimes = new Map<string, number>();
   const touched = (agentId: EvmAddress): void => opts.onAgentTouched?.(agentId);
 
-  async function blockTime(blockNumber: bigint): Promise<number> {
-    const key = blockNumber.toString();
-    let ts = blockTimes.get(key);
-    if (ts === undefined) {
-      ts = Number((await withRetry(() => client.getBlock({ blockNumber }))).timestamp);
-      blockTimes.set(key, ts);
-    }
-    return ts;
+  // Bounded-concurrency map; with the batched transport, 20 in flight is one or two RPC round trips.
+  async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+    let next = 0;
+    const worker = async (): Promise<void> => {
+      while (next < items.length) await fn(items[next++]!);
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   }
 
   // Merge into the existing erc8004 metadata so feedback imports and URI updates never clobber each other.
@@ -120,28 +121,40 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
   for (let from = start; from <= latest; from += chunk) {
     const to = from + chunk - 1n > latest ? latest : from + chunk - 1n;
 
-    const logs = await withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to }));
+    const [logs, uriLogs] = await Promise.all([
+      withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to })),
+      withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to })),
+    ]);
     result.fetched += logs.length;
+
+    // Prefetch every block timestamp and unknown token owner this chunk needs, concurrently.
+    const blocksNeeded = [...new Set([...logs, ...uriLogs].map((l) => l.blockNumber!.toString()))].filter((b) => !blockTimes.has(b));
+    await mapLimit(blocksNeeded, 20, async (b) => {
+      blockTimes.set(b, Number((await withRetry(() => client.getBlock({ blockNumber: BigInt(b) }))).timestamp));
+    });
+    const tokensNeeded = [...new Set(logs.map((l) => l.args.agentId!.toString()))].filter((t) => !owners.has(t) && !burned.has(t));
+    await mapLimit(tokensNeeded, 20, async (t) => {
+      try {
+        owners.set(t, (await withRetry(() => client.readContract({
+          address: identityRegistry,
+          abi: [OWNER_OF],
+          functionName: 'ownerOf',
+          args: [BigInt(t)],
+        }))) as EvmAddress);
+      } catch {
+        burned.add(t); // burned or unregistered agent token
+      }
+    });
 
     for (const log of logs) {
       const agentKey = log.args.agentId!.toString();
-      let owner = owners.get(agentKey);
+      const owner = owners.get(agentKey);
       if (!owner) {
-        try {
-          owner = (await withRetry(() => client.readContract({
-            address: identityRegistry,
-            abi: [OWNER_OF],
-            functionName: 'ownerOf',
-            args: [log.args.agentId!],
-          }))) as EvmAddress;
-        } catch {
-          result.skipped++; // burned or unregistered agent token (or RPC down: the chunk is retried next sync)
-          continue;
-        }
-        owners.set(agentKey, owner);
+        result.skipped++; // burned or unregistered agent token
+        continue;
       }
 
-      const blockTimestamp = await blockTime(log.blockNumber!);
+      const blockTimestamp = blockTimes.get(log.blockNumber!.toString())!;
 
       const event = mapFeedbackToEvent(opts.chainId, {
         txHash: log.transactionHash!,
@@ -175,7 +188,6 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
 
     // agentURI changes: the owner swapped what the token points at. Recorded, not scored,
     // so a consumer can discount history from before the swap.
-    const uriLogs = await withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to }));
     for (const log of uriLogs) {
       const tokenId = log.args.agentId!;
       const agentId = erc8004AgentId(opts.chainId, identityRegistry, tokenId);
@@ -183,7 +195,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
         txHash: log.transactionHash!,
         logIndex: log.logIndex!,
         blockNumber: Number(log.blockNumber!),
-        timestamp: new Date((await blockTime(log.blockNumber!)) * 1000).toISOString(),
+        timestamp: new Date(blockTimes.get(log.blockNumber!.toString())! * 1000).toISOString(),
         updatedBy: getAddress(log.args.updatedBy!) as EvmAddress,
         newURI: log.args.newURI ?? '',
       };
