@@ -74,7 +74,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     .prepare('SELECT last_block FROM erc8004_cursor WHERE key = ?')
     .get(cursorKey) as { last_block: number } | undefined;
 
-  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000 }));
+  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000, retryCount: 1 }));
   const client = createPublicClient({ transport: transports.length > 1 ? fallback(transports) : transports[0]! });
   const latest = opts.toBlock ?? (await client.getBlockNumber());
   const start = cursorRow ? BigInt(cursorRow.last_block) + 1n : (opts.fromBlock ?? 0n);
@@ -90,7 +90,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     const key = blockNumber.toString();
     let ts = blockTimes.get(key);
     if (ts === undefined) {
-      ts = Number((await client.getBlock({ blockNumber })).timestamp);
+      ts = Number((await withRetry(() => client.getBlock({ blockNumber }))).timestamp);
       blockTimes.set(key, ts);
     }
     return ts;
@@ -103,10 +103,24 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     eventLog.ensureAgent(agentId, { ...current, erc8004: patch(erc) });
   }
 
+  // Public RPCs shed load in bursts; one refused chunk must not abort a multi-hour backfill.
+  // ponytail: fixed 3-step backoff, make it configurable if a paid RPC needs different pacing.
+  async function withRetry<T>(fn: () => Promise<T>): Promise<T> {
+    const delays = [2_000, 5_000, 10_000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (err) {
+        if (attempt >= delays.length) throw err;
+        await new Promise((r) => setTimeout(r, delays[attempt]));
+      }
+    }
+  }
+
   for (let from = start; from <= latest; from += chunk) {
     const to = from + chunk - 1n > latest ? latest : from + chunk - 1n;
 
-    const logs = await client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to });
+    const logs = await withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to }));
     result.fetched += logs.length;
 
     for (const log of logs) {
@@ -114,14 +128,14 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
       let owner = owners.get(agentKey);
       if (!owner) {
         try {
-          owner = (await client.readContract({
+          owner = (await withRetry(() => client.readContract({
             address: identityRegistry,
             abi: [OWNER_OF],
             functionName: 'ownerOf',
             args: [log.args.agentId!],
-          })) as EvmAddress;
+          }))) as EvmAddress;
         } catch {
-          result.skipped++; // burned or unregistered agent token
+          result.skipped++; // burned or unregistered agent token (or RPC down: the chunk is retried next sync)
           continue;
         }
         owners.set(agentKey, owner);
@@ -161,7 +175,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
 
     // agentURI changes: the owner swapped what the token points at. Recorded, not scored,
     // so a consumer can discount history from before the swap.
-    const uriLogs = await client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to });
+    const uriLogs = await withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to }));
     for (const log of uriLogs) {
       const tokenId = log.args.agentId!;
       const agentId = erc8004AgentId(opts.chainId, identityRegistry, tokenId);
