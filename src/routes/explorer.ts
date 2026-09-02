@@ -4,7 +4,7 @@ import { EventLog } from '../storage/event-log.js';
 import { ReputationCache } from '../storage/cache.js';
 import { getOrComputeVector, validateAddress } from './reputation.js';
 import type { EvmAddress, ReputationEvent } from '../types/index.js';
-import { erc8004AgentId, ERC8004_IDENTITY_REGISTRIES } from '../erc8004/map.js';
+import { erc8004AgentId, ERC8004_IDENTITY_REGISTRIES, lastUriChange } from '../erc8004/map.js';
 
 // ponytail: volumeWeight is log(1+decayedCount), unbounded — 5 is a
 // display-only cap for the bar chart, not a real ceiling on the metric.
@@ -63,7 +63,7 @@ export function createExplorerRouter(
     const summary = engine.computeSummary(agentId, vector);
     const events = eventLog.getEventsByAgent(agentId).slice(-RECENT_EVENTS_LIMIT).reverse();
 
-    res.type('html').send(renderAgentPage(agentId, summary, events, agent.metadata));
+    res.type('html').send(renderAgentPage(agentId, summary, events, agent.metadata, eventLog.countEventsByAgentAfter(agentId, lastUriChange(agent.metadata))));
   });
 
   return router;
@@ -195,12 +195,13 @@ function renderAgentPage(
   summary: { reliabilityScore: number; completionRate: number; disputeRate: number; slaAdherence: number; volumeWeight: number; totalEvents: number; isActive: boolean; confidence: number; lastEventTimestamp: string; compositeScore: number },
   events: ReputationEvent[],
   metadata: Record<string, unknown>,
+  eventsUnderCurrentUri: number,
 ): string {
   const erc = metadata['erc8004'] as { chainId: number; identityRegistry: string; tokenId: string; owner?: string; uriUpdates?: { timestamp: string; updatedBy: string; txHash: string }[] } | undefined;
   const uriUpdates = erc?.uriUpdates ?? [];
   const identity = erc
     ? `<p class="meta">ERC-8004 agent #${escapeHtml(erc.tokenId)} on chain ${escapeHtml(String(erc.chainId))} &middot; registry ${escapeHtml(erc.identityRegistry)} &middot; owner at import ${escapeHtml(erc.owner ?? 'unknown')}</p>
-    <p class="meta">agentURI changed ${uriUpdates.length} time${uriUpdates.length === 1 ? '' : 's'} on chain${uriUpdates.length ? ': history before the last change may describe a different runtime' : ''}</p>
+    <p class="meta">agentURI changed ${uriUpdates.length} time${uriUpdates.length === 1 ? '' : 's'} on chain &middot; ${escapeHtml(eventsUnderCurrentUri)} events under the current agentURI${uriUpdates.length ? ' (older history may describe a different runtime)' : ''}</p>
     ${uriUpdates.map((u) => `<p class="meta">&nbsp;&nbsp;${escapeHtml(u.timestamp)} by ${escapeHtml(u.updatedBy)} &middot; tx ${escapeHtml(u.txHash)}</p>`).join('')}`
     : '';
   const rows = events.map((e) => `

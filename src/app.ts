@@ -2,6 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import express from 'express';
 import { getAddress } from 'viem';
+import { lastUriChange } from './erc8004/map.js';
 import { AttestationService } from './crypto/attestation.js';
 import { ReceiptService } from './crypto/receipt.js';
 import { setChainId } from './crypto/signing.js';
@@ -123,7 +124,8 @@ export function createOracleApp(config: AppConfig): OracleApp {
       res.status(404).json({ error: 'Agent not found' });
       return;
     }
-    res.json(agent);
+    // One scalar for "how much history was earned under the current agentURI"; a young URI is a discount signal.
+    res.json({ ...agent, eventsUnderCurrentUri: eventLog.countEventsByAgentAfter(agentId, lastUriChange(agent.metadata)) });
   });
 
   const reputationRouter = createReputationRouter(eventLog, cache, engine, receiptService);

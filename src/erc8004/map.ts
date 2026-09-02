@@ -84,6 +84,13 @@ export function withUriUpdate(
   return { ...erc8004, uriUpdates };
 }
 
+/** ISO timestamp of the most recent agentURI change in an agent's metadata, or undefined. */
+export function lastUriChange(metadata: Record<string, unknown>): string | undefined {
+  const erc = metadata['erc8004'] as { uriUpdates?: Erc8004UriUpdate[] } | undefined;
+  const updates = erc?.uriUpdates ?? [];
+  return updates.length ? updates[updates.length - 1]!.timestamp : undefined;
+}
+
 /** Stable key for one on-chain feedback log; also the v5 name behind the event id. */
 export function feedbackSourceKey(chainId: number, txHash: string, logIndex: number): string {
   return `erc8004:${chainId}:${txHash.toLowerCase()}:${logIndex}`;

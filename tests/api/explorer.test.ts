@@ -112,6 +112,7 @@ describe('explorer router', () => {
       const res = await request(app).get(`/explorer/${AGENT_ID}`).expect(200);
 
       expect(res.text).toContain('agentURI changed 1 time on chain');
+      expect(res.text).toContain('1 events under the current agentURI');
       expect(res.text).toContain('0x164AfDf1FEE71A07057e1d7086e1B10590F3b250');
     });
 

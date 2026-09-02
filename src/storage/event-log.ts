@@ -84,6 +84,14 @@ export class EventLog {
     return row.count;
   }
 
+  /** Events whose own timestamp is after `afterIso` (ISO strings compare lexically); all events when undefined. */
+  countEventsByAgentAfter(agentId: EvmAddress, afterIso?: string): number {
+    const row = this.db.prepare(
+      'SELECT COUNT(*) as count FROM events WHERE agent_id = ? AND timestamp > ?'
+    ).get(agentId, afterIso ?? '') as { count: number };
+    return row.count;
+  }
+
   ensureAgent(agentId: EvmAddress, metadata?: Record<string, unknown>): void {
     if (metadata) {
       this.db.prepare(`

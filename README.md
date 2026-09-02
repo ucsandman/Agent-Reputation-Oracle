@@ -206,6 +206,12 @@ protocol. Consumers should understand three layers:
    want to trust the oracle key can pull the log, verify each event's EIP-712
    signature, and run `ReputationEngine` locally to get the same vector.
 
+What the score binds: an identity (a wallet, or an ERC-8004 token) plus its
+declared agentURI over time. It does not bind the runtime that answered a given
+request; an operator can swap the model behind the same token and the log only
+shows the URI change, if there was one. See the ceiling paragraph in
+[docs/erc8004.md](./docs/erc8004.md#agent-identity).
+
 The current oracle still requires trusting the operator to preserve the event
 log, run the published scoring code, and protect the signing key. See
 [docs/threat-model.md](./docs/threat-model.md) for residual risks and planned

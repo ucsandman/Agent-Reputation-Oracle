@@ -157,6 +157,7 @@ describe('versioned API contract', () => {
     const found = await request(oracle.app).get(`/v1/agents/${SUBJECT_AGENT_ID}`).expect(200);
     expect(found.body.id).toBe(SUBJECT_AGENT_ID);
     expect(found.body.metadata.erc8004.tokenId).toBe('1');
+    expect(found.body.eventsUnderCurrentUri).toBe(0);
 
     await request(oracle.app).get('/v1/agents/0x9999999999999999999999999999999999999999').expect(404);
     await request(oracle.app).get('/v1/agents/nope').expect(400);

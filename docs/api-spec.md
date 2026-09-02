@@ -83,6 +83,7 @@ behind an id was swapped and discount older history.
   "createdAt": "…",
   "updatedAt": "…",
   "previousAddresses": [],
+  "eventsUnderCurrentUri": 42,
   "metadata": {
     "erc8004": {
       "chainId": 8453,
@@ -96,6 +97,9 @@ behind an id was swapped and discount older history.
   }
 }
 ```
+
+`eventsUnderCurrentUri` counts events dated after the most recent agentURI change (all
+events when it never changed). Reported, not applied to the score.
 
 **Errors:** `400` invalid address, `404` unknown agent.
 
