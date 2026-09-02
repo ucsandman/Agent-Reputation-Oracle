@@ -67,7 +67,7 @@ day 3 before deciding rather than calling it early.
 
 | Target | Sent date | Reply | Signal |
 |--------|-----------|-------|--------|
-| x402 Foundation | 2026-09-01 (https://github.com/x402-foundation/x402/issues/3345) | 2026-09-02: minia2auk (runs a live x402 resource server) confirmed blocklists + manual review are the status quo; pressure-tested portability and key rotation | Replied 2026-09-02 with GET /v1/events and token-keyed ERC-8004 ids (commit e982666) |
+| x402 Foundation | 2026-09-01 (https://github.com/x402-foundation/x402/issues/3345) | 2026-09-02: minia2auk (runs a live x402 resource server) confirmed blocklists + manual review are the status quo; pressure-tested portability and key rotation | Replied 2026-09-02 with GET /v1/events and token-keyed ERC-8004 ids (commit e982666). minia2auk 2026-09-02: accepted both fixes; ranked cost signals (ERC-8004 identity as binding layer, settlement history weighted highest, stake as spam floor only); flagged the second attribution hop (agent vs principal). Replied 2026-09-02 (https://github.com/x402-foundation/x402/issues/3345#issuecomment-5511547277): id binds to the token held by the principal, runtime swaps under the same token are now recorded (importer indexes URIUpdated, free GET /v1/agents/:agentId, explorer) |
 | Coinbase AgentKit | 2026-09-01 (https://github.com/coinbase/agentkit/issues/1476) | | |
 | x402 Bazaar | | | |
 | x402scan | | | |

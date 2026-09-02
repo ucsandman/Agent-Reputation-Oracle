@@ -91,6 +91,22 @@ describe('explorer router', () => {
       await request(app).get('/explorer/not-an-address').expect(400);
     });
 
+    it('shows ERC-8004 agentURI change history from metadata', async () => {
+      eventLog.ensureAgent(AGENT_ID, {
+        erc8004: {
+          chainId: 8453, identityRegistry: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432', tokenId: '55867',
+          uriUpdates: [{ timestamp: '2026-08-31T10:02:20.000Z', updatedBy: '0x164AfDf1FEE71A07057e1d7086e1B10590F3b250', txHash: '0xce2c', logIndex: 3, blockNumber: 50690598, newURI: 'data:x' }],
+        },
+      });
+      eventLog.ensureAgent(SOURCE_AGENT_ID);
+      eventLog.appendEvent(makeEvent());
+
+      const res = await request(app).get(`/explorer/${AGENT_ID}`).expect(200);
+
+      expect(res.text).toContain('agentURI changed 1 time on chain');
+      expect(res.text).toContain('0x164AfDf1FEE71A07057e1d7086e1B10590F3b250');
+    });
+
     it('returns 404 for unknown agent', async () => {
       await request(app)
         .get('/explorer/0x9999999999999999999999999999999999999999')

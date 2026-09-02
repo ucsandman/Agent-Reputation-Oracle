@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import express from 'express';
+import { getAddress } from 'viem';
 import { AttestationService } from './crypto/attestation.js';
 import { ReceiptService } from './crypto/receipt.js';
 import { setChainId } from './crypto/signing.js';
@@ -11,7 +12,7 @@ import { ReputationEngine } from './reputation/engine.js';
 import { ReputationCache } from './storage/cache.js';
 import { EventLog } from './storage/event-log.js';
 import { createPaymentMiddleware } from './x402/middleware.js';
-import type { AppConfig } from './types/index.js';
+import type { AppConfig, EvmAddress } from './types/index.js';
 
 export interface OracleApp {
   app: express.Express;
@@ -63,6 +64,23 @@ export function createOracleApp(config: AppConfig): OracleApp {
     const events = eventLog.getEventsAfter(after, limit);
     const last = events[events.length - 1];
     res.json({ events, nextAfter: last ? last.seq : after, limit });
+  });
+
+  // Free agent record: identity metadata (ERC-8004 token, owner at import, agentURI change history).
+  app.get('/v1/agents/:agentId', (req, res) => {
+    let agentId: EvmAddress;
+    try {
+      agentId = getAddress(String(req.params['agentId'])) as EvmAddress;
+    } catch {
+      res.status(400).json({ error: 'Invalid EVM address format' });
+      return;
+    }
+    const agent = eventLog.getAgent(agentId);
+    if (!agent) {
+      res.status(404).json({ error: 'Agent not found' });
+      return;
+    }
+    res.json(agent);
   });
 
   const reputationRouter = createReputationRouter(eventLog, cache, engine, receiptService);

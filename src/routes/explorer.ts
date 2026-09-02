@@ -170,9 +170,12 @@ function renderAgentPage(
   events: ReputationEvent[],
   metadata: Record<string, unknown>,
 ): string {
-  const erc = metadata['erc8004'] as { chainId: number; identityRegistry: string; tokenId: string; owner: string } | undefined;
+  const erc = metadata['erc8004'] as { chainId: number; identityRegistry: string; tokenId: string; owner?: string; uriUpdates?: { timestamp: string; updatedBy: string; txHash: string }[] } | undefined;
+  const uriUpdates = erc?.uriUpdates ?? [];
   const identity = erc
-    ? `<p class="meta">ERC-8004 agent #${escapeHtml(erc.tokenId)} on chain ${escapeHtml(String(erc.chainId))} &middot; registry ${escapeHtml(erc.identityRegistry)} &middot; owner at import ${escapeHtml(erc.owner)}</p>`
+    ? `<p class="meta">ERC-8004 agent #${escapeHtml(erc.tokenId)} on chain ${escapeHtml(String(erc.chainId))} &middot; registry ${escapeHtml(erc.identityRegistry)} &middot; owner at import ${escapeHtml(erc.owner ?? 'unknown')}</p>
+    <p class="meta">agentURI changed ${uriUpdates.length} time${uriUpdates.length === 1 ? '' : 's'} on chain${uriUpdates.length ? ': history before the last change may describe a different runtime' : ''}</p>
+    ${uriUpdates.map((u) => `<p class="meta">&nbsp;&nbsp;${escapeHtml(u.timestamp)} by ${escapeHtml(u.updatedBy)} &middot; tx ${escapeHtml(u.txHash)}</p>`).join('')}`
     : '';
   const rows = events.map((e) => `
     <tr>

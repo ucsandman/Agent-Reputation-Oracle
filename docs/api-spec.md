@@ -69,6 +69,36 @@ Loop with `after = nextAfter` until `events` is empty. Events imported from ERC-
 `proof.domain = "erc8004:<chainId>"` and a transaction hash as `proof.signature` instead of
 an EIP-712 signature; see [erc8004.md](./erc8004.md).
 
+## GET /v1/agents/:agentId
+
+**Free.** The agent record: id, timestamps, previous addresses after key rotation, and
+identity metadata. For agents imported from ERC-8004 the metadata carries the token behind
+the address and every on-chain `agentURI` change, so a consumer can tell when the runtime
+behind an id was swapped and discount older history.
+
+**Response 200:**
+```json
+{
+  "id": "0x…",
+  "createdAt": "…",
+  "updatedAt": "…",
+  "previousAddresses": [],
+  "metadata": {
+    "erc8004": {
+      "chainId": 8453,
+      "identityRegistry": "0x8004A169FB4a3325136EB29fA0ceB6D2e539a432",
+      "tokenId": "55867",
+      "owner": "0x…",
+      "uriUpdates": [
+        { "txHash": "0x…", "logIndex": 3, "blockNumber": 50690598, "timestamp": "…", "updatedBy": "0x…", "newURI": "…" }
+      ]
+    }
+  }
+}
+```
+
+**Errors:** `400` invalid address, `404` unknown agent.
+
 ## GET /v1/reputation/:agentId
 
 Full reputation vector with EIP-712 signed receipt.

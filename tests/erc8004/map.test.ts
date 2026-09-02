@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapFeedbackToEvent, normalizeConfidence, feedbackSourceKey, erc8004AgentId } from '../../src/erc8004/map.js';
+import { mapFeedbackToEvent, normalizeConfidence, feedbackSourceKey, erc8004AgentId, withUriUpdate } from '../../src/erc8004/map.js';
 import { ReputationEventSchema } from '../../src/models/event.js';
 import type { Erc8004Feedback } from '../../src/erc8004/map.js';
 
@@ -121,5 +121,28 @@ describe('mapFeedbackToEvent', () => {
     const result = ReputationEventSchema.safeParse(mapFeedbackToEvent(8453, baseLog));
     expect(result.error?.issues).toBeUndefined();
     expect(result.success).toBe(true);
+  });
+});
+
+describe('withUriUpdate', () => {
+  const base = { chainId: 8453, identityRegistry: baseLog.identityRegistry, tokenId: '55867' };
+  // Shape from a real Base mainnet URIUpdated log (tx 0xce2cff91..., block 50690598).
+  const update = {
+    txHash: '0xce2cff91bba619a6fd76374d3363d807143508a2e75919d8fd221c83e992ae27' as const,
+    logIndex: 3,
+    blockNumber: 50690598,
+    timestamp: '2026-08-31T10:02:20.000Z',
+    updatedBy: '0x164AfDf1FEE71A07057e1d7086e1B10590F3b250' as const,
+    newURI: 'data:application/json;base64,eyJuYW1lIjoiSmF5biBCbGFxIn0=',
+  };
+
+  it('appends, dedupes on tx+logIndex, and keeps chain order', () => {
+    const once = withUriUpdate(base, update);
+    const twice = withUriUpdate(once, update);
+    expect(twice).toBe(once);
+    const earlier = { ...update, txHash: '0xaa' as const, logIndex: 0, blockNumber: 50000000 };
+    const both = withUriUpdate(twice, earlier)['uriUpdates'] as { blockNumber: number }[];
+    expect(both.map((u) => u.blockNumber)).toEqual([50000000, 50690598]);
+    expect(once['tokenId']).toBe('55867');
   });
 });

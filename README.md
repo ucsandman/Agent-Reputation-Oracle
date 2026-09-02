@@ -135,6 +135,7 @@ exercised locally.
 | GET | `/v1/reputation/:agentId/attestations` | $0.001 | Paginated event history |
 | POST | `/v1/reputation/event` | Free by default | Submit signed reputation event (`PRICE_EVENT_SUBMIT`, default `0`) |
 | GET | `/v1/events?after=<seq>&limit=<n>` | Free | Raw append-order export of the whole event log, with each attester's original signature, for independent recomputation |
+| GET | `/v1/agents/:agentId` | Free | Agent record with identity metadata, including ERC-8004 token and on-chain agentURI change history |
 | GET | `/explorer` and `/explorer/:agentId` | Free | Human-readable browser view of an agent's score and event history |
 
 Full endpoint details are in [docs/api-spec.md](./docs/api-spec.md).

@@ -49,6 +49,33 @@ export function erc8004AgentId(chainId: number, identityRegistry: string, tokenI
   return getAddress(`0x${hash.slice(-40)}`) as EvmAddress;
 }
 
+/** One `URIUpdated` log from the Identity Registry: the owner pointed the token at a new agentURI. */
+export interface Erc8004UriUpdate {
+  txHash: `0x${string}`;
+  logIndex: number;
+  blockNumber: number;
+  /** ISO timestamp of the block. */
+  timestamp: string;
+  updatedBy: EvmAddress;
+  newURI: string;
+}
+
+/**
+ * Returns `erc8004` metadata with `uriUpdates` extended by one log, deduped on tx+logIndex
+ * and kept in chain order. Pure so the importer can replay ranges safely.
+ */
+export function withUriUpdate(
+  erc8004: Record<string, unknown>,
+  update: Erc8004UriUpdate,
+): Record<string, unknown> {
+  const existing = (erc8004['uriUpdates'] as Erc8004UriUpdate[] | undefined) ?? [];
+  if (existing.some((u) => u.txHash === update.txHash && u.logIndex === update.logIndex)) return erc8004;
+  const uriUpdates = [...existing, { ...update, newURI: update.newURI.slice(0, 2048) }].sort(
+    (a, b) => a.blockNumber - b.blockNumber || a.logIndex - b.logIndex,
+  );
+  return { ...erc8004, uriUpdates };
+}
+
 /** Stable key for one on-chain feedback log; also the v5 name behind the event id. */
 export function feedbackSourceKey(chainId: number, txHash: string, logIndex: number): string {
   return `erc8004:${chainId}:${txHash.toLowerCase()}:${logIndex}`;

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { createPublicClient, http, parseAbiItem, getAddress } from 'viem';
 import { EventLog } from '../src/storage/event-log.js';
-import { mapFeedbackToEvent } from '../src/erc8004/map.js';
+import { mapFeedbackToEvent, erc8004AgentId, withUriUpdate } from '../src/erc8004/map.js';
 import type { EvmAddress } from '../src/types/index.js';
 
 process.on('unhandledRejection', (reason) => {
@@ -31,6 +31,8 @@ const NEW_FEEDBACK = parseAbiItem(
   'event NewFeedback(uint256 indexed agentId, address indexed clientAddress, uint64 feedbackIndex, int128 value, uint8 valueDecimals, string indexed indexedTag1, string tag1, string tag2, string endpoint, string feedbackURI, bytes32 feedbackHash)'
 );
 const OWNER_OF = parseAbiItem('function ownerOf(uint256 tokenId) view returns (address)');
+// Identity Registry agentURI change (verified against Base mainnet, see docs/erc8004.md)
+const URI_UPDATED = parseAbiItem('event URIUpdated(uint256 indexed agentId, string newURI, address indexed updatedBy)');
 
 async function index(): Promise<void> {
   const dbDir = dirname(DB_PATH);
@@ -62,7 +64,27 @@ async function index(): Promise<void> {
   let fetched = 0;
   let imported = 0;
   let skipped = 0;
+  let uriUpdates = 0;
   let lastBlock = start - 1n;
+
+  const identityRegistry = getAddress(IDENTITY_REGISTRY!);
+
+  async function blockTime(blockNumber: bigint): Promise<number> {
+    const key = blockNumber.toString();
+    let ts = blockTimes.get(key);
+    if (ts === undefined) {
+      ts = Number((await client.getBlock({ blockNumber })).timestamp);
+      blockTimes.set(key, ts);
+    }
+    return ts;
+  }
+
+  // Merge into the existing erc8004 metadata so feedback imports and URI updates never clobber each other.
+  function mergeErc8004(agentId: EvmAddress, tokenId: string, patch: (erc: Record<string, unknown>) => Record<string, unknown>): void {
+    const current = eventLog.getAgent(agentId)?.metadata ?? {};
+    const erc = (current['erc8004'] as Record<string, unknown> | undefined) ?? { chainId: CHAIN_ID, identityRegistry, tokenId };
+    eventLog.ensureAgent(agentId, { ...current, erc8004: patch(erc) });
+  }
 
   for (let from = start; from <= latest; from += CHUNK) {
     const to = from + CHUNK - 1n > latest ? latest : from + CHUNK - 1n;
@@ -93,12 +115,7 @@ async function index(): Promise<void> {
         owners.set(agentKey, owner);
       }
 
-      const blockKey = log.blockNumber!.toString();
-      let blockTimestamp = blockTimes.get(blockKey);
-      if (blockTimestamp === undefined) {
-        blockTimestamp = Number((await client.getBlock({ blockNumber: log.blockNumber! })).timestamp);
-        blockTimes.set(blockKey, blockTimestamp);
-      }
+      const blockTimestamp = await blockTime(log.blockNumber!);
 
       const event = mapFeedbackToEvent(CHAIN_ID, {
         txHash: log.transactionHash!,
@@ -120,15 +137,31 @@ async function index(): Promise<void> {
         continue;
       }
 
-      eventLog.ensureAgent(event.agentId, {
-        erc8004: { chainId: CHAIN_ID, identityRegistry: getAddress(IDENTITY_REGISTRY!), tokenId: agentKey, owner },
-      });
+      mergeErc8004(event.agentId, agentKey, (erc) => ({ ...erc, owner }));
       eventLog.ensureAgent(event.sourceAgentId);
       if (eventLog.appendEvent(event)) {
         imported++;
       } else {
         skipped++; // already imported
       }
+    }
+
+    // agentURI changes: the owner swapped what the token points at. Recorded, not scored,
+    // so a consumer can discount history from before the swap.
+    const uriLogs = await client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to });
+    for (const log of uriLogs) {
+      const tokenId = log.args.agentId!;
+      const agentId = erc8004AgentId(CHAIN_ID, identityRegistry, tokenId);
+      const update = {
+        txHash: log.transactionHash!,
+        logIndex: log.logIndex!,
+        blockNumber: Number(log.blockNumber!),
+        timestamp: new Date((await blockTime(log.blockNumber!)) * 1000).toISOString(),
+        updatedBy: getAddress(log.args.updatedBy!) as EvmAddress,
+        newURI: log.args.newURI ?? '',
+      };
+      mergeErc8004(agentId, tokenId.toString(), (erc) => withUriUpdate(erc, update));
+      uriUpdates++;
     }
 
     lastBlock = to;
@@ -138,7 +171,7 @@ async function index(): Promise<void> {
   }
 
   console.log(`chain=${CHAIN_ID} range=${start}-${latest}`);
-  console.log(`fetched=${fetched} imported=${imported} skipped=${skipped} lastBlock=${lastBlock}`);
+  console.log(`fetched=${fetched} imported=${imported} skipped=${skipped} uriUpdates=${uriUpdates} lastBlock=${lastBlock}`);
 
   eventLog.close();
 }

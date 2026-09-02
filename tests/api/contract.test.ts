@@ -149,4 +149,16 @@ describe('versioned API contract', () => {
     expect(bad.body.events).toHaveLength(2);
     expect(bad.body.limit).toBe(1000);
   });
+
+  it('GET /v1/agents/:agentId returns the free agent record and 404/400 otherwise', async () => {
+    oracle = createOracleApp(config);
+    oracle.eventLog.ensureAgent(SUBJECT_AGENT_ID, { erc8004: { chainId: 8453, tokenId: '1', uriUpdates: [] } });
+
+    const found = await request(oracle.app).get(`/v1/agents/${SUBJECT_AGENT_ID}`).expect(200);
+    expect(found.body.id).toBe(SUBJECT_AGENT_ID);
+    expect(found.body.metadata.erc8004.tokenId).toBe('1');
+
+    await request(oracle.app).get('/v1/agents/0x9999999999999999999999999999999999999999').expect(404);
+    await request(oracle.app).get('/v1/agents/nope').expect(400);
+  });
 });
