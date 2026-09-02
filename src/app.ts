@@ -42,7 +42,50 @@ export function createOracleApp(config: AppConfig): OracleApp {
   const receiptService = new ReceiptService(config.server.privateKey);
 
   const app = express();
+  app.set('trust proxy', 1);
   app.use(express.json());
+
+  // Public-surface floor: humans and crawlers land on the explorer, the JSON API stays out of the index.
+  const baseUrl = (req: express.Request): string => `${req.protocol}://${req.get('host') ?? 'localhost'}`;
+  app.get('/', (_req, res) => res.redirect(302, '/explorer'));
+  app.use(['/v1', '/reputation', '/health'], (_req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex');
+    next();
+  });
+  app.get('/robots.txt', (req, res) => {
+    res.type('text/plain').send(`User-agent: *\nAllow: /explorer\nDisallow: /v1/\nDisallow: /reputation/\nDisallow: /health\nSitemap: ${baseUrl(req)}/sitemap.xml\n`);
+  });
+  app.get('/sitemap.xml', (req, res) => {
+    const base = baseUrl(req);
+    const agents = eventLog.getDatabase()
+      .prepare('SELECT agent_id, MAX(timestamp) AS last_ts FROM events GROUP BY agent_id ORDER BY last_ts DESC LIMIT 5000')
+      .all() as Array<{ agent_id: string; last_ts: string }>;
+    const urls = [`<url><loc>${base}/explorer</loc></url>`]
+      .concat(agents.map((a) => `<url><loc>${base}/explorer/${a.agent_id}</loc><lastmod>${a.last_ts.slice(0, 10)}</lastmod></url>`));
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join('')}</urlset>`);
+  });
+  app.get('/llms.txt', (req, res) => {
+    const base = baseUrl(req);
+    res.type('text/plain').send(`# Agent Reputation Oracle
+
+> Reputation scores for autonomous AI agents, computed from signed events (EIP-712 attestations, x402 transactions, ERC-8004 feedback) with attester weighting and 90-day decay. Open source, independently recomputable.
+
+## Free endpoints
+- ${base}/explorer : human explorer, search any agent address
+- ${base}/v1/events?after=0&limit=500 : raw append-order event log with original signatures, page with nextAfter
+- ${base}/v1/agents/{address} : agent record, ERC-8004 token and agentURI change history
+- ${base}/v1/health : oracle signing address and network
+
+## Paid endpoints (x402, ${config.x402.network})
+- GET /v1/reputation/{address} : full vector with signed receipt
+- GET /v1/reputation/{address}/summary
+- GET /v1/reputation/{address}/attestations
+
+## Docs
+- https://github.com/ucsandman/Agent-Reputation-Oracle
+- https://github.com/ucsandman/Agent-Reputation-Oracle/blob/main/docs/api-spec.md
+`);
+  });
 
   const healthHandler: express.RequestHandler = (_req, res) => {
     res.json({

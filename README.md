@@ -139,6 +139,9 @@ exercised locally.
 | GET | `/explorer` and `/explorer/:agentId` | Free | Human-readable browser view of an agent's score and event history |
 
 Full endpoint details are in [docs/api-spec.md](./docs/api-spec.md).
+
+**Live instance:** https://oracle-production-ab61.up.railway.app (Base mainnet, `eip155:8453`).
+Oracle signing address `0xF4FD1965b50E4536992414640B6Dd29E4ebAaAdC`, check it against `/v1/health`.
 Unversioned routes are still mounted as backward-compatible aliases.
 
 ## ERC-8004 Importer

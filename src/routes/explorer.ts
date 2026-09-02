@@ -94,13 +94,21 @@ const PAGE_STYLE = `
   .card { background: #fff; border: 1px solid #e5e5e5; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
 `;
 
-function renderPage(title: string, body: string): string {
+function renderPage(title: string, body: string, meta?: { description: string; path: string }): string {
+  const head = meta
+    ? `<meta name="description" content="${escapeHtml(meta.description)}">
+<link rel="canonical" href="${escapeHtml(meta.path)}">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(meta.description)}">
+<meta property="og:type" content="website">`
+    : '<meta name="robots" content="noindex">';
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
+${head}
 <style>${PAGE_STYLE}</style>
 </head>
 <body>
@@ -134,7 +142,7 @@ function renderSearchPage(rows: Array<{ agent_id: string; count: number; last_ts
     </form>
     <h2>Recently active agents</h2>
     ${list}
-  `);
+  `, { description: 'Look up any AI agent\'s reputation score, attester-weighted from signed on-chain and x402 events. Free, open source, independently verifiable.', path: '/explorer' });
 }
 
 function bar(label: string, value: number, max: number): string {
@@ -208,5 +216,5 @@ function renderAgentPage(
       <thead><tr><th>Type</th><th>Source agent</th><th>Timestamp</th><th>Summary</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="4">No events.</td></tr>'}</tbody>
     </table>
-  `);
+  `, { description: `Reputation ${summary.compositeScore}/100 for agent ${agentId} from ${summary.totalEvents} signed events, attester-weighted with 90-day decay.`, path: `/explorer/${agentId}` });
 }

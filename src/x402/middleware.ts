@@ -115,5 +115,12 @@ export function createPaymentMiddleware(config: AppConfig) {
     delete (routes as Record<string, unknown>)['POST /reputation/event'];
   }
 
-  return paymentMiddleware(routes, server, undefined, undefined, config.x402.syncOnStart);
+  const mw = paymentMiddleware(routes, server, undefined, undefined, config.x402.syncOnStart);
+  // A facilitator problem (unreachable, or supported kinds never synced) must fail the request, not the process.
+  return ((req, res, next) => {
+    Promise.resolve(mw(req, res, next)).catch((err: unknown) => {
+      console.error('x402 middleware error:', err instanceof Error ? err.message : err);
+      if (!res.headersSent) res.status(503).json({ error: 'Payment verification unavailable' });
+    });
+  }) as typeof mw;
 }

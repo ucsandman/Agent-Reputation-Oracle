@@ -161,4 +161,19 @@ describe('versioned API contract', () => {
     await request(oracle.app).get('/v1/agents/0x9999999999999999999999999999999999999999').expect(404);
     await request(oracle.app).get('/v1/agents/nope').expect(400);
   });
+
+  it('serves the public-surface floor and keeps the API out of the index', async () => {
+    oracle = createOracleApp(config);
+    const root = await request(oracle.app).get('/').expect(302);
+    expect(root.headers['location']).toBe('/explorer');
+    const robots = await request(oracle.app).get('/robots.txt').expect(200);
+    expect(robots.text).toContain('Disallow: /v1/');
+    expect(robots.text).toMatch(/Sitemap: http:\/\/.+\/sitemap\.xml/);
+    const sitemap = await request(oracle.app).get('/sitemap.xml').expect(200);
+    expect(sitemap.text).toContain('/explorer</loc>');
+    const llms = await request(oracle.app).get('/llms.txt').expect(200);
+    expect(llms.text).toContain('/v1/events');
+    const api = await request(oracle.app).get('/v1/events').expect(200);
+    expect(api.headers['x-robots-tag']).toBe('noindex');
+  });
 });

@@ -85,6 +85,8 @@ describe('explorer router', () => {
       expect(res.text).toContain('Dispute');
       expect(res.text).toContain('SLA');
       expect(res.text).toContain('Volume');
+      expect(res.text).toContain(`<link rel="canonical" href="/explorer/${AGENT_ID}">`);
+      expect(res.text).toMatch(/<meta name="description" content="Reputation \d+\/100 for agent/);
     });
 
     it('returns 400 for invalid address', async () => {
