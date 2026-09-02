@@ -142,11 +142,24 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     }
   }
 
+  // Public RPCs cap getLogs by block range or response size with no common error shape. Split the range
+  // in half on any failure until it fits; only a range at the floor gets the slow retry path.
+  async function getLogsSplit<E extends typeof NEW_FEEDBACK | typeof URI_UPDATED>(address: EvmAddress, event: E, from: bigint, to: bigint): Promise<Awaited<ReturnType<typeof client.getLogs<E>>>> {
+    if (to - from < 100n) return withRetry(() => client.getLogs({ address, event, fromBlock: from, toBlock: to }));
+    try {
+      return await client.getLogs({ address, event, fromBlock: from, toBlock: to });
+    } catch {
+      const mid = from + (to - from) / 2n;
+      const [a, b] = await Promise.all([getLogsSplit(address, event, from, mid), getLogsSplit(address, event, mid + 1n, to)]);
+      return [...a, ...b] as Awaited<ReturnType<typeof client.getLogs<E>>>;
+    }
+  }
+
   // Fetch PARALLEL_CHUNKS chunks of logs at once, then process them in block order so the cursor stays monotonic.
   const PARALLEL_CHUNKS = 4n;
   const fetchChunk = (from: bigint, to: bigint) => Promise.all([
-    withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to })),
-    withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to })),
+    getLogsSplit(reputationRegistry, NEW_FEEDBACK, from, to),
+    getLogsSplit(identityRegistry, URI_UPDATED, from, to),
   ]);
 
   for (let groupStart = start; groupStart <= latest; groupStart += chunk * PARALLEL_CHUNKS) {
