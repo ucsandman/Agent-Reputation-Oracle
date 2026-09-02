@@ -11,6 +11,15 @@ const OWNER_OF = parseAbiItem('function ownerOf(uint256 tokenId) view returns (a
 // Identity Registry agentURI change (verified against Base mainnet, see docs/erc8004.md)
 const URI_UPDATED = parseAbiItem('event URIUpdated(uint256 indexed agentId, string newURI, address indexed updatedBy)');
 
+/**
+ * OP-stack chains produce a block every fixed interval, so timestamp = genesis + seconds * block exactly.
+ * Verified on Base mainnet at blocks 0, 41663783, 50690598, 50747928 and head (2026-09-02).
+ * The indexer re-checks the head block at start and falls back to eth_getBlockByNumber on a mismatch.
+ */
+const FIXED_BLOCK_TIME: Record<number, { genesis: number; seconds: number }> = {
+  8453: { genesis: 1686789347, seconds: 2 },
+};
+
 export interface Erc8004IndexerOptions {
   /** One or more JSON-RPC URLs; more than one becomes a fallback transport. */
   rpcUrls: string[];
@@ -24,7 +33,7 @@ export interface Erc8004IndexerOptions {
   chunk?: bigint;
   /** Called for every agent whose stored data changed, so a live server can drop its cache. */
   onAgentTouched?: (agentId: EvmAddress) => void;
-  /** Called every 100 chunks with the running totals, for long backfills. */
+  /** Called every 20 chunks with the running totals, for long backfills. */
   onProgress?: (partial: Erc8004IndexerResult) => void;
 }
 
@@ -83,6 +92,16 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
   const result: Erc8004IndexerResult = { start, latest, fetched: 0, imported: 0, skipped: 0, uriUpdates: 0, lastBlock: start - 1n };
   if (start > latest) return result;
 
+  let fixed = FIXED_BLOCK_TIME[opts.chainId];
+  if (fixed) {
+    const headTs = Number((await client.getBlock({ blockNumber: latest })).timestamp);
+    if (headTs !== fixed.genesis + fixed.seconds * Number(latest)) {
+      console.error(`erc8004: fixed block time formula disagrees with chain ${opts.chainId} at block ${latest}, falling back to RPC lookups`);
+      fixed = undefined;
+    }
+  }
+  const blockTime = (b: bigint): number => (fixed ? fixed.genesis + fixed.seconds * Number(b) : blockTimes.get(b.toString())!);
+
   const owners = new Map<string, EvmAddress>();
   const burned = new Set<string>();
   const blockTimes = new Map<string, number>();
@@ -128,7 +147,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     result.fetched += logs.length;
 
     // Prefetch every block timestamp and unknown token owner this chunk needs, concurrently.
-    const blocksNeeded = [...new Set([...logs, ...uriLogs].map((l) => l.blockNumber!.toString()))].filter((b) => !blockTimes.has(b));
+    const blocksNeeded = fixed ? [] : [...new Set([...logs, ...uriLogs].map((l) => l.blockNumber!.toString()))].filter((b) => !blockTimes.has(b));
     await mapLimit(blocksNeeded, 20, async (b) => {
       blockTimes.set(b, Number((await withRetry(() => client.getBlock({ blockNumber: BigInt(b) }))).timestamp));
     });
@@ -154,7 +173,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
         continue;
       }
 
-      const blockTimestamp = blockTimes.get(log.blockNumber!.toString())!;
+      const blockTimestamp = blockTime(log.blockNumber!);
 
       const event = mapFeedbackToEvent(opts.chainId, {
         txHash: log.transactionHash!,
@@ -195,7 +214,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
         txHash: log.transactionHash!,
         logIndex: log.logIndex!,
         blockNumber: Number(log.blockNumber!),
-        timestamp: new Date(blockTimes.get(log.blockNumber!.toString())! * 1000).toISOString(),
+        timestamp: new Date(blockTime(log.blockNumber!) * 1000).toISOString(),
         updatedBy: getAddress(log.args.updatedBy!) as EvmAddress,
         newURI: log.args.newURI ?? '',
       };
@@ -208,7 +227,7 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     db.prepare(
       'INSERT INTO erc8004_cursor (key, last_block) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET last_block = excluded.last_block'
     ).run(cursorKey, Number(to));
-    if (((to - start + 1n) / chunk) % 100n === 0n) opts.onProgress?.({ ...result });
+    if (((to - start + 1n) / chunk) % 20n === 0n) opts.onProgress?.({ ...result });
   }
 
   return result;
