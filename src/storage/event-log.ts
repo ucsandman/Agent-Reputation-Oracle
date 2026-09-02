@@ -84,7 +84,14 @@ export class EventLog {
     return row.count;
   }
 
-  ensureAgent(agentId: EvmAddress): void {
+  ensureAgent(agentId: EvmAddress, metadata?: Record<string, unknown>): void {
+    if (metadata) {
+      this.db.prepare(`
+        INSERT INTO agents (id, metadata) VALUES (?, ?)
+        ON CONFLICT(id) DO UPDATE SET metadata = excluded.metadata, updated_at = datetime('now')
+      `).run(agentId, JSON.stringify(metadata));
+      return;
+    }
     this.db.prepare(`
       INSERT OR IGNORE INTO agents (id) VALUES (?)
     `).run(agentId);
@@ -121,6 +128,17 @@ export class EventLog {
         UPDATE agents SET updated_at = datetime('now') WHERE id = ?
       `).run(oldAddress);
     })();
+  }
+
+  /**
+   * Append-order page of the whole log for external replay. `seq` is the SQLite rowid,
+   * so a consumer can resume with `after = last seq` and never miss or repeat an event.
+   */
+  getEventsAfter(after: number, limit: number): Array<ReputationEvent & { seq: number }> {
+    const rows = this.db.prepare(
+      'SELECT rowid AS seq, * FROM events WHERE rowid > ? ORDER BY rowid ASC LIMIT ?'
+    ).all(after, limit) as Array<EventRow & { seq: number }>;
+    return rows.map((row) => ({ seq: row.seq, ...rowToEvent(row) }));
   }
 
   *getAllEvents(batchSize: number = 1000): Generator<ReputationEvent[]> {

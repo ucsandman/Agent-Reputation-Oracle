@@ -124,4 +124,29 @@ describe('versioned API contract', () => {
       oracle.receiptService.verifyReceipt(reputation.body.receipt),
     ).resolves.toBe(true);
   });
+
+  it('exports the raw log at GET /v1/events so a consumer can recompute without the oracle key', async () => {
+    oracle = createOracleApp(config);
+    const first = await signedEvent({ type: 'transaction_completed', completedSuccessfully: true, valueUsd: 1, durationMs: 1 });
+    const second = await signedEvent({ type: 'transaction_completed', completedSuccessfully: false, valueUsd: 2, durationMs: 2 });
+    await request(oracle.app).post('/v1/reputation/event').send(first).expect(201);
+    await request(oracle.app).post('/v1/reputation/event').send(second).expect(201);
+
+    const page1 = await request(oracle.app).get('/v1/events?limit=1').expect(200);
+    expect(page1.body.events).toHaveLength(1);
+    expect(page1.body.events[0].id).toBe(first.id);
+    expect(page1.body.events[0].proof.signature).toBe(first.proof.signature);
+    expect(page1.body.nextAfter).toBe(page1.body.events[0].seq);
+
+    const page2 = await request(oracle.app).get(`/v1/events?after=${page1.body.nextAfter}`).expect(200);
+    expect(page2.body.events.map((e: { id: string }) => e.id)).toEqual([second.id]);
+
+    const page3 = await request(oracle.app).get(`/v1/events?after=${page2.body.nextAfter}`).expect(200);
+    expect(page3.body.events).toEqual([]);
+    expect(page3.body.nextAfter).toBe(page2.body.nextAfter);
+
+    const bad = await request(oracle.app).get('/v1/events?after=abc&limit=99999').expect(200);
+    expect(bad.body.events).toHaveLength(2);
+    expect(bad.body.limit).toBe(1000);
+  });
 });

@@ -104,7 +104,9 @@ async function index(): Promise<void> {
         txHash: log.transactionHash!,
         logIndex: log.logIndex!,
         blockTimestamp,
-        agentAddress: owner,
+        identityRegistry: IDENTITY_REGISTRY!,
+        agentTokenId: log.args.agentId!,
+        ownerAddress: owner,
         clientAddress: log.args.clientAddress!,
         value: log.args.value!,
         valueDecimals: log.args.valueDecimals!,
@@ -118,7 +120,9 @@ async function index(): Promise<void> {
         continue;
       }
 
-      eventLog.ensureAgent(event.agentId);
+      eventLog.ensureAgent(event.agentId, {
+        erc8004: { chainId: CHAIN_ID, identityRegistry: getAddress(IDENTITY_REGISTRY!), tokenId: agentKey, owner },
+      });
       eventLog.ensureAgent(event.sourceAgentId);
       if (eventLog.appendEvent(event)) {
         imported++;

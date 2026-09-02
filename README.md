@@ -134,6 +134,7 @@ exercised locally.
 | GET | `/v1/reputation/:agentId/summary` | $0.0005 | Lightweight reputation summary |
 | GET | `/v1/reputation/:agentId/attestations` | $0.001 | Paginated event history |
 | POST | `/v1/reputation/event` | Free by default | Submit signed reputation event (`PRICE_EVENT_SUBMIT`, default `0`) |
+| GET | `/v1/events?after=<seq>&limit=<n>` | Free | Raw append-order export of the whole event log, with each attester's original signature, for independent recomputation |
 | GET | `/explorer` and `/explorer/:agentId` | Free | Human-readable browser view of an agent's score and event history |
 
 Full endpoint details are in [docs/api-spec.md](./docs/api-spec.md).
@@ -145,7 +146,8 @@ Unversioned routes are still mounted as backward-compatible aliases.
 Reputation Registry on chain and appends them to the event log as
 attestations, so the oracle has real data before any agent submits a single
 event through the API. It's read-only, idempotent, and resumes from a
-stored cursor on re-run. See [docs/erc8004.md](./docs/erc8004.md) for
+stored cursor on re-run. Imported agents are keyed on the ERC-8004 token id,
+not the owner wallet, so reputation survives the owner rotating keys. See [docs/erc8004.md](./docs/erc8004.md) for
 supported chains, contract addresses, and how on-chain values map to event
 fields.
 
@@ -194,6 +196,10 @@ protocol. Consumers should understand three layers:
 3. **Receipt authenticity:** full reputation responses include a signed receipt
    from the oracle. Consumers can verify the receipt signature and compare the
    `oracleAddress` against `/v1/health`.
+4. **Independent recomputation:** `GET /v1/events` is a free, paged export of
+   the raw log with every attester signature intact. A consumer that does not
+   want to trust the oracle key can pull the log, verify each event's EIP-712
+   signature, and run `ReputationEngine` locally to get the same vector.
 
 The current oracle still requires trusting the operator to preserve the event
 log, run the published scoring code, and protect the signing key. See

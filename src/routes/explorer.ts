@@ -50,7 +50,7 @@ export function createExplorerRouter(
     const summary = engine.computeSummary(agentId, vector);
     const events = eventLog.getEventsByAgent(agentId).slice(-RECENT_EVENTS_LIMIT).reverse();
 
-    res.type('html').send(renderAgentPage(agentId, summary, events));
+    res.type('html').send(renderAgentPage(agentId, summary, events, agent.metadata));
   });
 
   return router;
@@ -168,7 +168,12 @@ function renderAgentPage(
   agentId: EvmAddress,
   summary: { reliabilityScore: number; completionRate: number; disputeRate: number; slaAdherence: number; volumeWeight: number; totalEvents: number; isActive: boolean; confidence: number; lastEventTimestamp: string; compositeScore: number },
   events: ReputationEvent[],
+  metadata: Record<string, unknown>,
 ): string {
+  const erc = metadata['erc8004'] as { chainId: number; identityRegistry: string; tokenId: string; owner: string } | undefined;
+  const identity = erc
+    ? `<p class="meta">ERC-8004 agent #${escapeHtml(erc.tokenId)} on chain ${escapeHtml(String(erc.chainId))} &middot; registry ${escapeHtml(erc.identityRegistry)} &middot; owner at import ${escapeHtml(erc.owner)}</p>`
+    : '';
   const rows = events.map((e) => `
     <tr>
       <td>${escapeHtml(e.eventType)}</td>
@@ -180,6 +185,7 @@ function renderAgentPage(
   return renderPage(`Agent ${agentId}`, `
     <p><a href="/explorer">&larr; Back to explorer</a></p>
     <h1>${escapeHtml(agentId)}</h1>
+    ${identity}
     <div class="card">
       <div class="composite">${escapeHtml(String(summary.compositeScore))} / 100</div>
       ${bar('Reliability', summary.reliabilityScore, 1)}

@@ -249,4 +249,29 @@ describe('countEventsByAgentSince', () => {
     const future = new Date(Date.now() + 3600_000).toISOString();
     expect(log.countEventsByAgentSince(AGENT_ID, future)).toBe(0);
   });
+
+  describe('getEventsAfter', () => {
+    it('pages the whole log in append order by rowid cursor', () => {
+      const ids = [makeEvent(), makeEvent(), makeEvent()].map((e) => { log.appendEvent(e); return e.id; });
+
+      const page1 = log.getEventsAfter(0, 2);
+      expect(page1.map((e) => e.id)).toEqual(ids.slice(0, 2));
+      expect(page1.map((e) => e.seq)).toEqual([1, 2]);
+
+      const page2 = log.getEventsAfter(page1[1]!.seq, 2);
+      expect(page2.map((e) => e.id)).toEqual([ids[2]]);
+      expect(log.getEventsAfter(page2[0]!.seq, 2)).toEqual([]);
+    });
+  });
+
+  describe('ensureAgent metadata', () => {
+    it('stores metadata and updates it on a later call', () => {
+      log.ensureAgent(AGENT_ID, { erc8004: { tokenId: '1' } });
+      expect(log.getAgent(AGENT_ID)?.metadata).toEqual({ erc8004: { tokenId: '1' } });
+      log.ensureAgent(AGENT_ID);
+      expect(log.getAgent(AGENT_ID)?.metadata).toEqual({ erc8004: { tokenId: '1' } });
+      log.ensureAgent(AGENT_ID, { erc8004: { tokenId: '2' } });
+      expect(log.getAgent(AGENT_ID)?.metadata).toEqual({ erc8004: { tokenId: '2' } });
+    });
+  });
 });

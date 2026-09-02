@@ -45,6 +45,30 @@ Free endpoint. No payment required.
 
 ---
 
+## GET /v1/events
+
+**Free.** Raw, append-order export of the whole event log, intended for consumers that
+want to recompute reputation locally instead of trusting the oracle's receipt key.
+Every event carries the attester's original EIP-712 `proof`, so each one can be verified
+independently, and `seq` is a monotonic cursor (SQLite rowid) that never repeats or skips.
+
+**Query parameters:**
+- `after` (integer, default `0`): return events with `seq` greater than this.
+- `limit` (integer, 1-1000, default `500`).
+
+**Response 200:**
+```json
+{
+  "events": [ { "seq": 1, "id": "…", "agentId": "0x…", "eventType": "attestation", "timestamp": "…", "data": { … }, "proof": { … }, "sourceAgentId": "0x…" } ],
+  "nextAfter": 1,
+  "limit": 500
+}
+```
+
+Loop with `after = nextAfter` until `events` is empty. Events imported from ERC-8004 carry
+`proof.domain = "erc8004:<chainId>"` and a transaction hash as `proof.signature` instead of
+an EIP-712 signature; see [erc8004.md](./erc8004.md).
+
 ## GET /v1/reputation/:agentId
 
 Full reputation vector with EIP-712 signed receipt.

@@ -56,6 +56,15 @@ export function createOracleApp(config: AppConfig): OracleApp {
   app.get('/v1/health', healthHandler);
   app.use('/explorer', createExplorerRouter(eventLog, cache, engine));
 
+  // Free, unsigned export of the raw log so anyone can recompute scores without trusting the oracle key.
+  app.get('/v1/events', (req, res) => {
+    const after = Math.max(0, parseInt(String(req.query['after'] ?? '0'), 10) || 0);
+    const limit = Math.min(1000, Math.max(1, parseInt(String(req.query['limit'] ?? '500'), 10) || 500));
+    const events = eventLog.getEventsAfter(after, limit);
+    const last = events[events.length - 1];
+    res.json({ events, nextAfter: last ? last.seq : after, limit });
+  });
+
   const reputationRouter = createReputationRouter(eventLog, cache, engine, receiptService);
   const eventsRouter = createEventsRouter(eventLog, cache, attestationService, config);
 

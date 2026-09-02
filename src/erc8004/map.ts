@@ -10,8 +10,12 @@ export interface Erc8004Feedback {
   logIndex: number;
   /** Unix seconds of the block containing the feedback log. */
   blockTimestamp: number;
-  /** Owner of the ERC-721 agent token (Identity Registry `ownerOf(agentId)`). */
-  agentAddress: string;
+  /** Identity Registry contract the agent token lives in. */
+  identityRegistry: string;
+  /** ERC-721 token id of the agent (`agentId` of the NewFeedback log). */
+  agentTokenId: bigint;
+  /** Current owner of the agent token (`ownerOf(agentId)`), used only to drop self-feedback. */
+  ownerAddress: string;
   /** Feedback author (`clientAddress` of the NewFeedback log). */
   clientAddress: string;
   /** Signed fixed-point score (`value` of the NewFeedback log). */
@@ -35,6 +39,16 @@ export function normalizeConfidence(value: bigint, valueDecimals: number): numbe
   return Math.min(raw <= 1 ? raw : raw / 100, 1);
 }
 
+/**
+ * Oracle agent id for an ERC-8004 agent: derived from the token, not its owner wallet,
+ * so the identity survives the owner rotating keys or transferring the token.
+ * Last 20 bytes of keccak256("erc8004:<chainId>:<registry>:<tokenId>"), checksummed.
+ */
+export function erc8004AgentId(chainId: number, identityRegistry: string, tokenId: bigint): EvmAddress {
+  const hash = keccak256(toHex(`erc8004:${chainId}:${identityRegistry.toLowerCase()}:${tokenId}`));
+  return getAddress(`0x${hash.slice(-40)}`) as EvmAddress;
+}
+
 /** Stable key for one on-chain feedback log; also the v5 name behind the event id. */
 export function feedbackSourceKey(chainId: number, txHash: string, logIndex: number): string {
   return `erc8004:${chainId}:${txHash.toLowerCase()}:${logIndex}`;
@@ -45,9 +59,9 @@ export function feedbackSourceKey(chainId: number, txHash: string, logIndex: num
  * Returns null for self-feedback (client == agent owner), which carries no signal.
  */
 export function mapFeedbackToEvent(chainId: number, log: Erc8004Feedback): ReputationEvent | null {
-  const agentId = getAddress(log.agentAddress) as EvmAddress;
   const sourceAgentId = getAddress(log.clientAddress) as EvmAddress;
-  if (agentId === sourceAgentId) return null;
+  if (getAddress(log.ownerAddress) === sourceAgentId) return null;
+  const agentId = erc8004AgentId(chainId, log.identityRegistry, log.agentTokenId);
 
   const sourceKey = feedbackSourceKey(chainId, log.txHash, log.logIndex);
   const comment = [log.tag1, log.tag2, log.feedbackURI].filter(Boolean).join(' ').slice(0, 1000);

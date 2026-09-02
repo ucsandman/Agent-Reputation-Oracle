@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mapFeedbackToEvent, normalizeConfidence, feedbackSourceKey } from '../../src/erc8004/map.js';
+import { mapFeedbackToEvent, normalizeConfidence, feedbackSourceKey, erc8004AgentId } from '../../src/erc8004/map.js';
 import { ReputationEventSchema } from '../../src/models/event.js';
 import type { Erc8004Feedback } from '../../src/erc8004/map.js';
 
@@ -9,7 +9,9 @@ const baseLog: Erc8004Feedback = {
   txHash: '0x8880a2dc45cc9c8ebd21dab96e401c103e84ec30175e8aaa1332a2e5c854ed9f',
   logIndex: 348,
   blockTimestamp: 1788285203,
-  agentAddress: '0x69747C4Ce6185d21A33b3BcdBa980d659600aC7b',
+  identityRegistry: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+  agentTokenId: 25975n,
+  ownerAddress: '0x69747C4Ce6185d21A33b3BcdBa980d659600aC7b',
   clientAddress: '0x7cf8286c9B476DE7c262D086E2861FECefd3810b',
   value: 1n,
   valueDecimals: 0,
@@ -39,11 +41,11 @@ describe('normalizeConfidence', () => {
 describe('mapFeedbackToEvent', () => {
   it('skips self-feedback', () => {
     expect(
-      mapFeedbackToEvent(8453, { ...baseLog, clientAddress: baseLog.agentAddress })
+      mapFeedbackToEvent(8453, { ...baseLog, clientAddress: baseLog.ownerAddress })
     ).toBeNull();
     // Same address, different casing, still self-feedback.
     expect(
-      mapFeedbackToEvent(8453, { ...baseLog, clientAddress: baseLog.agentAddress.toLowerCase() })
+      mapFeedbackToEvent(8453, { ...baseLog, clientAddress: baseLog.ownerAddress.toLowerCase() })
     ).toBeNull();
   });
 
@@ -63,7 +65,7 @@ describe('mapFeedbackToEvent', () => {
     const event = mapFeedbackToEvent(8453, baseLog)!;
 
     expect(event.eventType).toBe('attestation');
-    expect(event.agentId).toBe('0x69747C4Ce6185d21A33b3BcdBa980d659600aC7b');
+    expect(event.agentId).toBe(erc8004AgentId(8453, baseLog.identityRegistry, 25975n));
     expect(event.sourceAgentId).toBe('0x7cf8286c9B476DE7c262D086E2861FECefd3810b');
     expect(event.timestamp).toBe('2026-09-01T17:53:23.000Z');
     expect(event.data).toMatchObject({ type: 'attestation', category: 'reliability', confidence: 1 });
@@ -74,13 +76,28 @@ describe('mapFeedbackToEvent', () => {
     expect(event.proof.typedDataHash).toMatch(/^0x[0-9a-f]{64}$/);
   });
 
+  it('keys the agent on the token, so the id survives an owner key rotation', () => {
+    const before = mapFeedbackToEvent(8453, baseLog)!;
+    const after = mapFeedbackToEvent(8453, {
+      ...baseLog,
+      ownerAddress: '0x000000000000000000000000000000000000dEaD',
+      logIndex: 349,
+    })!;
+    expect(after.agentId).toBe(before.agentId);
+    expect(before.agentId).not.toBe(baseLog.ownerAddress);
+
+    // Different token, chain, or registry is a different agent.
+    expect(erc8004AgentId(8453, baseLog.identityRegistry, 25976n)).not.toBe(before.agentId);
+    expect(erc8004AgentId(84532, baseLog.identityRegistry, 25975n)).not.toBe(before.agentId);
+    expect(erc8004AgentId(8453, baseLog.identityRegistry.toLowerCase(), 25975n)).toBe(before.agentId);
+  });
+
   it('checksums lowercase addresses coming off the chain', () => {
     const event = mapFeedbackToEvent(8453, {
       ...baseLog,
-      agentAddress: baseLog.agentAddress.toLowerCase(),
       clientAddress: baseLog.clientAddress.toLowerCase(),
     })!;
-    expect(event.agentId).toBe(baseLog.agentAddress);
+    expect(event.agentId).toMatch(/^0x[0-9a-fA-F]{40}$/);
     expect(event.sourceAgentId).toBe(baseLog.clientAddress);
   });
 
@@ -89,7 +106,9 @@ describe('mapFeedbackToEvent', () => {
       txHash: baseLog.txHash,
       logIndex: 1,
       blockTimestamp: baseLog.blockTimestamp,
-      agentAddress: baseLog.agentAddress,
+      identityRegistry: baseLog.identityRegistry,
+      agentTokenId: baseLog.agentTokenId,
+      ownerAddress: baseLog.ownerAddress,
       clientAddress: baseLog.clientAddress,
       value: 87n,
       valueDecimals: 0,
