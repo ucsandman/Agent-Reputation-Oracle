@@ -1,4 +1,4 @@
-import { createPublicClient, fallback, http, parseAbiItem, getAddress } from 'viem';
+import { createPublicClient, fallback, http, parseAbiItem, getAddress, BaseError, ContractFunctionRevertedError } from 'viem';
 import { EventLog } from '../storage/event-log.js';
 import { mapFeedbackToEvent, erc8004AgentId, withUriUpdate } from './map.js';
 import type { EvmAddress } from '../types/index.js';
@@ -19,6 +19,9 @@ const URI_UPDATED = parseAbiItem('event URIUpdated(uint256 indexed agentId, stri
 const FIXED_BLOCK_TIME: Record<number, { genesis: number; seconds: number }> = {
   8453: { genesis: 1686789347, seconds: 2 },
 };
+
+/** Multicall3 lives at the same address on every major EVM chain. */
+const MULTICALL3 = '0xcA11bde05977b3631167028862bE2a173976CA11';
 
 export interface Erc8004IndexerOptions {
   /** One or more JSON-RPC URLs; more than one becomes a fallback transport. */
@@ -44,6 +47,8 @@ export interface Erc8004IndexerResult {
   imported: number;
   skipped: number;
   uriUpdates: number;
+  /** Tokens confirmed burned/unregistered by a direct revert; their feedback is skipped. */
+  burned: number;
   lastBlock: bigint;
 }
 
@@ -83,13 +88,13 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     .prepare('SELECT last_block FROM erc8004_cursor WHERE key = ?')
     .get(cursorKey) as { last_block: number } | undefined;
 
-  // batch: concurrent calls within 10ms collapse into one JSON-RPC batch request.
-  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000, retryCount: 1, batch: { batchSize: 50, wait: 10 } }));
+  // No JSON-RPC batching: mainnet.base.org rejects batch requests, and the fallback must work on every listed URL.
+  const transports = opts.rpcUrls.map((u) => http(u, { timeout: 30_000, retryCount: 1 }));
   const client = createPublicClient({ transport: transports.length > 1 ? fallback(transports) : transports[0]! });
   const latest = opts.toBlock ?? (await client.getBlockNumber());
   const start = cursorRow ? BigInt(cursorRow.last_block) + 1n : (opts.fromBlock ?? 0n);
 
-  const result: Erc8004IndexerResult = { start, latest, fetched: 0, imported: 0, skipped: 0, uriUpdates: 0, lastBlock: start - 1n };
+  const result: Erc8004IndexerResult = { start, latest, fetched: 0, imported: 0, skipped: 0, uriUpdates: 0, burned: 0, lastBlock: start - 1n };
   if (start > latest) return result;
 
   let fixed = FIXED_BLOCK_TIME[opts.chainId];
@@ -137,13 +142,22 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     }
   }
 
-  for (let from = start; from <= latest; from += chunk) {
-    const to = from + chunk - 1n > latest ? latest : from + chunk - 1n;
+  // Fetch PARALLEL_CHUNKS chunks of logs at once, then process them in block order so the cursor stays monotonic.
+  const PARALLEL_CHUNKS = 4n;
+  const fetchChunk = (from: bigint, to: bigint) => Promise.all([
+    withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to })),
+    withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to })),
+  ]);
 
-    const [logs, uriLogs] = await Promise.all([
-      withRetry(() => client.getLogs({ address: reputationRegistry, event: NEW_FEEDBACK, fromBlock: from, toBlock: to })),
-      withRetry(() => client.getLogs({ address: identityRegistry, event: URI_UPDATED, fromBlock: from, toBlock: to })),
-    ]);
+  for (let groupStart = start; groupStart <= latest; groupStart += chunk * PARALLEL_CHUNKS) {
+    const ranges: Array<[bigint, bigint]> = [];
+    for (let from = groupStart; from <= latest && from < groupStart + chunk * PARALLEL_CHUNKS; from += chunk) {
+      ranges.push([from, from + chunk - 1n > latest ? latest : from + chunk - 1n]);
+    }
+    const fetched = await Promise.all(ranges.map(([from, to]) => fetchChunk(from, to)));
+
+  for (const [i, [, to]] of ranges.entries()) {
+    const [logs, uriLogs] = fetched[i]!;
     result.fetched += logs.length;
 
     // Prefetch every block timestamp and unknown token owner this chunk needs, concurrently.
@@ -151,19 +165,39 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     await mapLimit(blocksNeeded, 20, async (b) => {
       blockTimes.set(b, Number((await withRetry(() => client.getBlock({ blockNumber: BigInt(b) }))).timestamp));
     });
+    // One eth_call per chunk via Multicall3. A per-item revert means burned/unregistered; a transport
+    // error throws and the chunk is retried, so an RPC outage can never masquerade as a burned token.
     const tokensNeeded = [...new Set(logs.map((l) => l.args.agentId!.toString()))].filter((t) => !owners.has(t) && !burned.has(t));
-    await mapLimit(tokensNeeded, 20, async (t) => {
-      try {
-        owners.set(t, (await withRetry(() => client.readContract({
-          address: identityRegistry,
-          abi: [OWNER_OF],
-          functionName: 'ownerOf',
-          args: [BigInt(t)],
-        }))) as EvmAddress);
-      } catch {
-        burned.add(t); // burned or unregistered agent token
+    if (tokensNeeded.length > 0) {
+      const results = await withRetry(() => client.multicall({
+        multicallAddress: MULTICALL3,
+        allowFailure: true,
+        batchSize: 16_384,
+        contracts: tokensNeeded.map((t) => ({ address: identityRegistry, abi: [OWNER_OF], functionName: 'ownerOf' as const, args: [BigInt(t)] as const })),
+      }));
+      const unresolved: string[] = [];
+      results.forEach((r, i) => {
+        if (r.status === 'success') owners.set(tokensNeeded[i]!, getAddress(r.result as string) as EvmAddress);
+        else unresolved.push(tokensNeeded[i]!);
+      });
+      // Public RPCs have returned per-item failures for live tokens. Confirm each one directly: only a
+      // contract revert means burned; anything else throws so the chunk is retried instead of skipped.
+      for (const t of unresolved) {
+        try {
+          owners.set(t, getAddress(await withRetry(() => client.readContract({
+            address: identityRegistry,
+            abi: [OWNER_OF],
+            functionName: 'ownerOf',
+            args: [BigInt(t)],
+          })) as string) as EvmAddress);
+        } catch (err) {
+          const reverted = err instanceof BaseError && err.walk((e) => e instanceof ContractFunctionRevertedError) !== null;
+          if (!reverted) throw err;
+          burned.add(t);
+          result.burned++;
+        }
       }
-    });
+    }
 
     for (const log of logs) {
       const agentKey = log.args.agentId!.toString();
@@ -229,10 +263,11 @@ export async function indexErc8004(eventLog: EventLog, opts: Erc8004IndexerOptio
     ).run(cursorKey, Number(to));
     if (((to - start + 1n) / chunk) % 20n === 0n) opts.onProgress?.({ ...result });
   }
+  }
 
   return result;
 }
 
 export function formatIndexerResult(chainId: number, r: Erc8004IndexerResult): string {
-  return `erc8004 chain=${chainId} range=${r.start}-${r.latest} fetched=${r.fetched} imported=${r.imported} skipped=${r.skipped} uriUpdates=${r.uriUpdates} lastBlock=${r.lastBlock}`;
+  return `erc8004 chain=${chainId} range=${r.start}-${r.latest} fetched=${r.fetched} imported=${r.imported} skipped=${r.skipped} burned=${r.burned} uriUpdates=${r.uriUpdates} lastBlock=${r.lastBlock}`;
 }
