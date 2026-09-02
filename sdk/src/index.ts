@@ -20,6 +20,9 @@ export type {
   EventQueryOptions,
   AttestationsResponse,
   HealthResponse,
+  EventsQueryOptions,
+  EventsPage,
+  AgentRecord,
 } from './types.js';
 
 export {

@@ -39,6 +39,14 @@ export function normalizeConfidence(value: bigint, valueDecimals: number): numbe
   return Math.min(raw <= 1 ? raw : raw / 100, 1);
 }
 
+/** Identity Registry per chain id (see docs/erc8004.md for verification status). */
+export const ERC8004_IDENTITY_REGISTRIES: Record<number, string> = {
+  1: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+  8453: '0x8004A169FB4a3325136EB29fA0ceB6D2e539a432',
+  84532: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
+  11155111: '0x8004A818BFB912233c491871b3d84c89A494BD9e',
+};
+
 /**
  * Oracle agent id for an ERC-8004 agent: derived from the token, not its owner wallet,
  * so the identity survives the owner rotating keys or transferring the token.

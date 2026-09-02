@@ -224,6 +224,37 @@ describe('ReputationOracleClient', () => {
     });
   });
 
+  describe('getEvents()', () => {
+    it('pages the free event log with after/limit', async () => {
+      const body = { events: [{ seq: 7, id: 'e' }], nextAfter: 7, limit: 2 };
+      client = createClient({ fetch: mockFetch(body) });
+      const page = await client.getEvents({ after: 5, limit: 2 });
+      expect(page.nextAfter).toBe(7);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://oracle.example.com/v1/events?after=5&limit=2',
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
+  });
+
+  describe('getAgent()', () => {
+    it('fetches the free agent record', async () => {
+      const body = { id: AGENT_ID, createdAt: 't', updatedAt: 't', previousAddresses: [], metadata: { erc8004: { tokenId: '1' } } };
+      client = createClient({ fetch: mockFetch(body) });
+      const agent = await client.getAgent(AGENT_ID);
+      expect(agent.metadata).toEqual({ erc8004: { tokenId: '1' } });
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://oracle.example.com/v1/agents/${AGENT_ID}`,
+        expect.objectContaining({ method: 'GET' }),
+      );
+    });
+
+    it('maps 404 to AgentNotFoundError', async () => {
+      client = createClient({ fetch: mockFetch({ error: 'Agent not found' }, 404) });
+      await expect(client.getAgent(AGENT_ID)).rejects.toBeInstanceOf(AgentNotFoundError);
+    });
+  });
+
   describe('verifyReceipt()', () => {
     it('verifies a valid receipt from the oracle', async () => {
       const vector: ReputationVector = {

@@ -89,6 +89,12 @@ describe('explorer router', () => {
       expect(res.text).toMatch(/<meta name="description" content="Reputation \d+\/100 for agent/);
     });
 
+    it('redirects an ERC-8004 chain/token pair to the derived agent address', async () => {
+      const res = await request(app).get('/explorer/erc8004/8453/55867').expect(302);
+      expect(res.headers['location']).toBe('/explorer/0x3219091d9Dd2Fc8D8912cf1565d23d2a7C23CC8c');
+      await request(app).get('/explorer/erc8004/999/1').expect(400);
+    });
+
     it('returns 400 for invalid address', async () => {
       await request(app).get('/explorer/not-an-address').expect(400);
     });

@@ -4,6 +4,7 @@ import { EventLog } from '../storage/event-log.js';
 import { ReputationCache } from '../storage/cache.js';
 import { getOrComputeVector, validateAddress } from './reputation.js';
 import type { EvmAddress, ReputationEvent } from '../types/index.js';
+import { erc8004AgentId, ERC8004_IDENTITY_REGISTRIES } from '../erc8004/map.js';
 
 // ponytail: volumeWeight is log(1+decayedCount), unbounded — 5 is a
 // display-only cap for the bar chart, not a real ceiling on the metric.
@@ -31,6 +32,18 @@ export function createExplorerRouter(
     ).all(RECENT_AGENTS_LIMIT) as Array<{ agent_id: string; count: number; last_ts: string }>;
 
     res.type('html').send(renderSearchPage(rows));
+  });
+
+  // ERC-8004 agents are keyed on a synthetic address; let token holders find themselves by token id.
+  router.get('/erc8004/:chainId/:tokenId', (req, res) => {
+    const chainId = parseInt(String(req.params['chainId']), 10);
+    const registry = ERC8004_IDENTITY_REGISTRIES[chainId];
+    const tokenId = String(req.params['tokenId']);
+    if (!registry || !/^\d+$/.test(tokenId)) {
+      res.status(400).type('html').send(renderMessagePage('Unknown ERC-8004 agent', 'Chain id must be one of 1, 8453, 84532, 11155111 and token id must be a number.'));
+      return;
+    }
+    res.redirect(302, `/explorer/${erc8004AgentId(chainId, registry, BigInt(tokenId))}`);
   });
 
   router.get('/:agentId', (req, res) => {
@@ -139,6 +152,11 @@ function renderSearchPage(rows: Array<{ agent_id: string; count: number; last_ts
     <form method="GET" action="/explorer">
       <input type="text" name="address" placeholder="0x... agent address" required>
       <button type="submit">Look up</button>
+    </form>
+    <form method="GET" action="/explorer/erc8004" onsubmit="location.href='/explorer/erc8004/'+this.chain.value+'/'+this.token.value;return false">
+      <select name="chain"><option value="8453">Base</option><option value="1">Ethereum</option><option value="84532">Base Sepolia</option><option value="11155111">Sepolia</option></select>
+      <input type="text" name="token" inputmode="numeric" pattern="[0-9]+" placeholder="ERC-8004 token id" required>
+      <button type="submit">Find agent</button>
     </form>
     <h2>Recently active agents</h2>
     ${list}

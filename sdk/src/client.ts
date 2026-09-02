@@ -10,6 +10,9 @@ import type {
   EventQueryOptions,
   HealthResponse,
   SignedReceipt,
+  EventsQueryOptions,
+  EventsPage,
+  AgentRecord,
 } from './types.js';
 import {
   OracleHttpError,
@@ -78,6 +81,20 @@ export class ReputationOracleClient {
     });
 
     return this.request<EventSubmissionResponse>('POST', '/reputation/event', event);
+  }
+
+  /** Free, unsigned page of the raw event log for independent recomputation. Loop until `events` is empty. */
+  async getEvents(options?: EventsQueryOptions): Promise<EventsPage> {
+    const params = new URLSearchParams();
+    if (options?.after !== undefined) params.set('after', String(options.after));
+    if (options?.limit !== undefined) params.set('limit', String(options.limit));
+    const qs = params.toString();
+    return this.request<EventsPage>('GET', `/v1/events${qs ? `?${qs}` : ''}`);
+  }
+
+  /** Free agent record with identity metadata (ERC-8004 token and agentURI change history). */
+  async getAgent(agentId: EvmAddress): Promise<AgentRecord> {
+    return this.request<AgentRecord>('GET', `/v1/agents/${agentId}`);
   }
 
   async verifyReceipt(receipt: SignedReceipt): Promise<boolean> {

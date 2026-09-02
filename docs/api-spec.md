@@ -99,6 +99,11 @@ behind an id was swapped and discount older history.
 
 **Errors:** `400` invalid address, `404` unknown agent.
 
+ERC-8004 agents are keyed on a synthetic address derived from the token (see
+[erc8004.md](./erc8004.md#agent-identity)). `GET /explorer/erc8004/:chainId/:tokenId`
+redirects a chain and token id to the right explorer page; the SDK's `getAgent` takes the
+derived address.
+
 ## GET /v1/reputation/:agentId
 
 Full reputation vector with EIP-712 signed receipt.

@@ -168,6 +168,31 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+// ─── Free log export and agent record ───
+
+export interface EventsQueryOptions {
+  /** Return events with seq greater than this (default 0). */
+  after?: number;
+  /** 1-1000, default 500. */
+  limit?: number;
+}
+
+export interface EventsPage {
+  events: Array<ReputationEvent & { seq: number }>;
+  /** Pass back as `after` to fetch the next page; unchanged when the page is empty. */
+  nextAfter: number;
+  limit: number;
+}
+
+export interface AgentRecord {
+  id: EvmAddress;
+  createdAt: string;
+  updatedAt: string;
+  previousAddresses: EvmAddress[];
+  /** For ERC-8004 agents: `{ erc8004: { chainId, identityRegistry, tokenId, owner?, uriUpdates? } }`. */
+  metadata: Record<string, unknown>;
+}
+
 // ─── Client Config ───
 
 export interface OracleClientConfig {

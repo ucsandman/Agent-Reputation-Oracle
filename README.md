@@ -137,6 +137,7 @@ exercised locally.
 | GET | `/v1/events?after=<seq>&limit=<n>` | Free | Raw append-order export of the whole event log, with each attester's original signature, for independent recomputation |
 | GET | `/v1/agents/:agentId` | Free | Agent record with identity metadata, including ERC-8004 token and on-chain agentURI change history |
 | GET | `/explorer` and `/explorer/:agentId` | Free | Human-readable browser view of an agent's score and event history |
+| GET | `/explorer/erc8004/:chainId/:tokenId` | Free | Redirects an ERC-8004 token to its explorer page |
 
 Full endpoint details are in [docs/api-spec.md](./docs/api-spec.md).
 
@@ -221,6 +222,16 @@ docker compose up --build
 
 The compose setup runs the API in production mode, stores SQLite data in a
 named volume, and exposes `/health` for container health checks.
+
+The public instance runs the same image on Railway: one service built from
+this Dockerfile, a volume mounted at `/app/data`, and the `.env.example`
+variables set on the service. Two settings matter in production:
+
+- `X402_SYNC_ON_START=true`, so the server fetches the facilitator's supported
+  networks at boot. Without it every paid route answers 503.
+- The `ERC8004_*` variables, which make the server backfill and then poll the
+  Base mainnet registries itself (see [docs/erc8004.md](./docs/erc8004.md)).
+  Give `ERC8004_RPC_URL` two or three public endpoints separated by commas.
 
 ## Architecture
 
