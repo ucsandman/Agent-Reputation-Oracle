@@ -108,6 +108,10 @@ X or Discord session. Each block below is the exact text, tailored per target.
 Reply on their own post or in their general channel, one per day at most for
 X so it does not read as spam.
 
+Live instance since 2026-09-02: https://oracle-production-ab61.up.railway.app (Base
+mainnet, ERC-8004 backfill running inside the server). Only mention it if someone
+asks what exists; the question posts stay pitch-free.
+
 **@CoinbaseDev (reply to the Bazaar launch thread, x.com/CoinbaseDev/status/1965445897489428869)**
 > Quick question, not selling anything. When a service listed in the Bazaar turns out to be broken or malicious and an agent loses USDC calling it, how is that handled today? Blocklist, manual review, nothing yet? Building an open source agent reputation oracle and trying to learn what already exists.
 
